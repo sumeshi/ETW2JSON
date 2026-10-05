@@ -66,4 +66,10 @@
 
         void WriteWbemSid(string value);
     }
+
+    /// <summary>Optional lifecycle hook for writers that stage an event until WriteEventEnd.</summary>
+    public interface IAbortableEtwWriter
+    {
+        void AbortEvent();
+    }
 }

@@ -4,7 +4,7 @@
 
     public interface IEventTraceOperand
     {
-        int EventMetadataTableIndex { get; }
+        int EventMetadataTableIndex { get; set; }
 
         EventMetadata Metadata { get; }
 

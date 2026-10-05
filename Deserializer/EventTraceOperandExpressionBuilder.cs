@@ -136,6 +136,7 @@
 
                         var expr = (Expression)loopVariable;
                         ConvertIfNecessary(ref expr, ref end);
+                        list.Add(this.eventRecordReader.Call(nameof(EventRecordReader.ReserveArrayElements), Expression.Convert(end, typeof(ulong))));
                         list.Add(this.eventRecordWriter.Call("WriteArrayBegin"));
                         list.Add(For(loopVariable, Expression.Constant(0), Expression.LessThan(expr, end), Expression.AddAssign(loopVariable, Expression.Constant(1)), c));
                         list.Add(this.eventRecordWriter.Call("WriteArrayEnd"));

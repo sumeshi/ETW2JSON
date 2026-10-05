@@ -7,11 +7,20 @@
 
     public struct EventRecordReader
     {
+        public const ulong MaximumArrayElements = 65536;
+
         private readonly unsafe EVENT_RECORD* eventRecord;
+        private readonly ArrayElementBudget arrayElementBudget;
 
         internal unsafe EventRecordReader(EVENT_RECORD* eventRecord)
         {
             this.eventRecord = eventRecord;
+            this.arrayElementBudget = new ArrayElementBudget();
+        }
+
+        public void ReserveArrayElements(ulong count)
+        {
+            this.arrayElementBudget.Reserve(count);
         }
 
         /// <summary>
@@ -22,15 +31,19 @@
         {
             int length = 0;
             byte* ptr = this.eventRecord->UserData;
-            long maxLength = this.eventRecord->UserDataLength - (this.eventRecord->UserData - this.eventRecord->UserDataFixed);
-
-            while (!(ptr[length] == 0 && ptr[length + 1] == 0) && length < maxLength)
+            int maxLength = this.RemainingBytes;
+            while (length + 1 < maxLength && !(ptr[length] == 0 && ptr[length + 1] == 0))
             {
-                ++length;
+                length += 2;
             }
 
-            string value = new string((char*)this.eventRecord->UserData, 0, (length + 1) / 2);
-            this.eventRecord->UserData += (value.Length + 1) * 2; // +2 (via the multiplication)
+            if (length + 1 >= maxLength)
+            {
+                throw new InvalidOperationException("Unterminated or truncated UTF-16 payload string.");
+            }
+
+            string value = new string((char*)this.eventRecord->UserData, 0, length / 2);
+            this.eventRecord->UserData += length + 2;
             return value;
         }
 
@@ -78,10 +91,15 @@
         {
             int length = 0;
             byte* ptr = this.eventRecord->UserData;
-            long maxLength = this.eventRecord->UserDataLength - (this.eventRecord->UserData - this.eventRecord->UserDataFixed);
-            while (ptr[length] != 0 && length < maxLength)
+            int maxLength = this.RemainingBytes;
+            while (length < maxLength && ptr[length] != 0)
             {
                 ++length;
+            }
+
+            if (length == maxLength)
+            {
+                throw new InvalidOperationException("Unterminated payload string.");
             }
 
             var arr = new char[length];
@@ -136,6 +154,7 @@
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public unsafe sbyte ReadInt8()
         {
+            this.EnsureAvailable(sizeof(sbyte));
             sbyte value = *(sbyte*)this.eventRecord->UserData;
             this.eventRecord->UserData += sizeof(sbyte);
             return value;
@@ -147,6 +166,7 @@
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public unsafe byte ReadUInt8()
         {
+            this.EnsureAvailable(sizeof(byte));
             byte value = *this.eventRecord->UserData;
             this.eventRecord->UserData += sizeof(byte);
             return value;
@@ -158,6 +178,7 @@
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public unsafe short ReadInt16()
         {
+            this.EnsureAvailable(sizeof(short));
             short value = *(short*)this.eventRecord->UserData;
             this.eventRecord->UserData += sizeof(short);
             return value;
@@ -169,6 +190,7 @@
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public unsafe ushort ReadUInt16()
         {
+            this.EnsureAvailable(sizeof(ushort));
             ushort value = *(ushort*)this.eventRecord->UserData;
             this.eventRecord->UserData += sizeof(ushort);
             return value;
@@ -180,6 +202,7 @@
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public unsafe int ReadInt32()
         {
+            this.EnsureAvailable(sizeof(int));
             int value = *(int*)this.eventRecord->UserData;
             this.eventRecord->UserData += sizeof(int);
             return value;
@@ -191,6 +214,7 @@
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public unsafe uint ReadUInt32()
         {
+            this.EnsureAvailable(sizeof(uint));
             uint value = *(uint*)this.eventRecord->UserData;
             this.eventRecord->UserData += sizeof(uint);
             return value;
@@ -202,6 +226,7 @@
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public unsafe long ReadInt64()
         {
+            this.EnsureAvailable(sizeof(long));
             long value = *(long*)this.eventRecord->UserData;
             this.eventRecord->UserData += sizeof(long);
             return value;
@@ -213,6 +238,7 @@
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public unsafe ulong ReadUInt64()
         {
+            this.EnsureAvailable(sizeof(ulong));
             ulong value = *(ulong*)this.eventRecord->UserData;
             this.eventRecord->UserData += sizeof(ulong);
             return value;
@@ -224,6 +250,7 @@
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public unsafe float ReadFloat()
         {
+            this.EnsureAvailable(sizeof(float));
             float value = *(float*)this.eventRecord->UserData;
             this.eventRecord->UserData += sizeof(float);
             return value;
@@ -235,6 +262,7 @@
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public unsafe double ReadDouble()
         {
+            this.EnsureAvailable(sizeof(double));
             double value = *(double*)this.eventRecord->UserData;
             this.eventRecord->UserData += sizeof(double);
             return value;
@@ -246,6 +274,7 @@
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public unsafe bool ReadBoolean()
         {
+            this.EnsureAvailable(sizeof(int));
             bool value = *(int*)this.eventRecord->UserData != 0;
             this.eventRecord->UserData += sizeof(int);
             return value;
@@ -257,6 +286,7 @@
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public unsafe byte[] ReadBinary(short size)
         {
+            this.EnsureAvailable(size);
             var value = new byte[size];
             Marshal.Copy((IntPtr)this.eventRecord->UserData, value, 0, size);
             this.eventRecord->UserData += size;
@@ -269,6 +299,7 @@
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public unsafe byte[] ReadBinary(ushort size)
         {
+            this.EnsureAvailable(size);
             var value = new byte[size];
             Marshal.Copy((IntPtr)this.eventRecord->UserData, value, 0, size);
             this.eventRecord->UserData += size;
@@ -281,6 +312,7 @@
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public unsafe byte[] ReadBinary(int size)
         {
+            this.EnsureAvailable(size);
             var value = new byte[size];
             Marshal.Copy((IntPtr)this.eventRecord->UserData, value, 0, size);
             this.eventRecord->UserData += size;
@@ -293,6 +325,8 @@
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public unsafe byte[] ReadBinary(uint size)
         {
+            if (size > int.MaxValue) throw new InvalidOperationException("Payload length exceeds supported bounds.");
+            this.EnsureAvailable((int)size);
             var value = new byte[size];
             Marshal.Copy((IntPtr)this.eventRecord->UserData, value, 0, (int)size);
             this.eventRecord->UserData += size;
@@ -305,6 +339,7 @@
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public unsafe Guid ReadGuid()
         {
+            this.EnsureAvailable(sizeof(Guid));
             Guid value = *(Guid*)this.eventRecord->UserData;
             this.eventRecord->UserData += sizeof(Guid);
             return value;
@@ -356,6 +391,9 @@
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public unsafe string ReadSid()
         {
+            this.EnsureAvailable(8);
+            int binaryLength = 8 + (this.eventRecord->UserData[1] * 4);
+            this.EnsureAvailable(binaryLength);
             var value = new SecurityIdentifier((IntPtr)this.eventRecord->UserData);
             this.eventRecord->UserData += value.BinaryLength;
             return value.Value;
@@ -413,7 +451,7 @@
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public unsafe string ReadNonNullTerminatedString()
         {
-            return this.ReadUnicodeStringHelper(this.eventRecord->UserDataLength);
+            return this.ReadUnicodeStringHelper(this.RemainingBytes);
         }
 
         /// <summary>
@@ -422,7 +460,7 @@
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public unsafe string ReadNonNullTerminatedAnsiString()
         {
-            return this.ReadAnsiStringHelper(this.eventRecord->UserDataLength);
+            return this.ReadAnsiStringHelper(this.RemainingBytes);
         }
 
         /// <summary>
@@ -431,6 +469,7 @@
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public unsafe char ReadUnicodeChar()
         {
+            this.EnsureAvailable(sizeof(char));
             char value = *(char*)this.eventRecord->UserData;
             this.eventRecord->UserData += sizeof(char);
             return value;
@@ -442,6 +481,7 @@
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public unsafe char ReadAnsiChar()
         {
+            this.EnsureAvailable(sizeof(byte));
             char value = (char)*this.eventRecord->UserData;
             this.eventRecord->UserData += 1;
             return value;
@@ -458,6 +498,12 @@
             return this.ReadBinary(this.ReadInt32());
         }
 
+        /// <summary>Consumes and returns all remaining payload bytes.</summary>
+        public unsafe byte[] ReadRemainingBytes()
+        {
+            return this.ReadBinary(this.RemainingBytes);
+        }
+
         /// <summary>
         /// Reader for TDH_INTYPE_WBEMSID
         /// </summary>
@@ -465,6 +511,7 @@
         public unsafe string ReadWbemSid()
         {
             int pointerSize = (eventRecord->Flags & Etw.EVENT_HEADER_FLAG_32_BIT_HEADER) == Etw.EVENT_HEADER_FLAG_32_BIT_HEADER ? 4 : 8;
+            this.EnsureAvailable(pointerSize * 2);
             this.eventRecord->UserData += pointerSize * 2;
             return this.ReadSid();
         }
@@ -472,6 +519,7 @@
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private unsafe string ReadAnsiStringHelper(int length)
         {
+            this.EnsureAvailable(length);
             byte* ptr = this.eventRecord->UserData;
             var arr = new char[length];
             for (int i = 0; i < length; ++i)
@@ -486,9 +534,54 @@
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private unsafe string ReadUnicodeStringHelper(int length)
         {
+            this.EnsureAvailable(length);
             string value = new string((char*)this.eventRecord->UserData, 0, length / 2);
             this.eventRecord->UserData += value.Length * 2;
             return value;
+        }
+
+        private unsafe int RemainingBytes
+        {
+            get
+            {
+                if (this.eventRecord == null || this.eventRecord->UserDataFixed == null || this.eventRecord->UserData == null)
+                {
+                    throw new InvalidOperationException("Event payload pointer is unavailable.");
+                }
+
+                long consumed = this.eventRecord->UserData - this.eventRecord->UserDataFixed;
+                if (consumed < 0 || consumed > this.eventRecord->UserDataLength)
+                {
+                    throw new InvalidOperationException("Event payload cursor is outside the payload bounds.");
+                }
+
+                return this.eventRecord->UserDataLength - (int)consumed;
+            }
+        }
+
+        private unsafe void EnsureAvailable(int count)
+        {
+            if (count < 0 || count > this.RemainingBytes)
+            {
+                throw new InvalidOperationException("Event payload is truncated or has an invalid length.");
+            }
+        }
+    }
+}
+
+namespace ETWDeserializer
+{
+    internal sealed class ArrayElementBudget
+    {
+        private ulong reserved;
+
+        public void Reserve(ulong count)
+        {
+            if (count > EventRecordReader.MaximumArrayElements - this.reserved)
+            {
+                throw new System.InvalidOperationException("ETW array element budget exceeds the safe limit of " + EventRecordReader.MaximumArrayElements + "; event retained as raw payload.");
+            }
+            this.reserved += count;
         }
     }
 }

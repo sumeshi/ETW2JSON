@@ -2,12 +2,14 @@
 {
     using System;
     using System.IO;
+    using System.Collections.Generic;
     using System.Text;
+    using System.Xml;
     using System.Xml.Serialization;
 
     internal sealed class EventSourceManifest
     {
-        private readonly StringBuilder chunkBuilder = new StringBuilder();
+        private readonly SortedDictionary<ushort, byte[]> chunks = new SortedDictionary<ushort, byte[]>();
 
         private readonly Guid providerGuid;
 
@@ -21,9 +23,9 @@
 
         private readonly ushort totalChunks;
 
-        private ushort chunksReceived;
-
         private instrumentationManifest manifest;
+
+        private const ushort MaximumChunks = 1024;
 
         public EventSourceManifest(Guid providerGuid, byte format, byte majorVersion, byte minorVersion, byte magic, ushort totalChunks)
         {
@@ -32,28 +34,56 @@
             this.majorVersion = majorVersion;
             this.minorVersion = minorVersion;
             this.magic = magic;
+            if (totalChunks == 0 || totalChunks > MaximumChunks)
+            {
+                throw new InvalidOperationException("EventSource manifest chunk count is invalid or exceeds the safety limit.");
+            }
             this.totalChunks = totalChunks;
         }
 
-        public bool IsComplete => this.chunksReceived == this.totalChunks;
+        public bool IsComplete => this.chunks.Count == this.totalChunks;
+
+        public bool HasChunk(ushort chunkNumber) => this.chunks.ContainsKey(chunkNumber);
 
         public instrumentationManifest Schema
         {
             get
             {
-                if (this.chunksReceived != this.totalChunks)
+                if (!this.IsComplete)
                 {
                     throw new Exception("Schema is incomplete as not all chunks have been received");
                 }
 
                 if (this.manifest == null)
                 {
-                    string value = this.chunkBuilder.ToString();
-                    var bytes = Encoding.ASCII.GetBytes(value);
-                    using (var ms = new MemoryStream(bytes))
+                    int totalBytes = 0;
+                    foreach (var chunk in this.chunks.Values) totalBytes = checked(totalBytes + chunk.Length);
+                    if (totalBytes > 16 * 1024 * 1024)
+                    {
+                        throw new InvalidOperationException("EventSource manifest exceeds the safety size limit.");
+                    }
+
+                    var bytes = new byte[totalBytes];
+                    int offset = 0;
+                    foreach (var chunk in this.chunks.Values)
+                    {
+                        Buffer.BlockCopy(chunk, 0, bytes, offset, chunk.Length);
+                        offset += chunk.Length;
+                    }
+
+                    using (var ms = new MemoryStream(bytes, false))
                     {
                         var serializer = new Microsoft.Xml.Serialization.GeneratedAssembly.instrumentationManifestSerializer();
-                        this.manifest = (instrumentationManifest)serializer.Deserialize(ms);
+                        var settings = new XmlReaderSettings
+                        {
+                            DtdProcessing = DtdProcessing.Prohibit,
+                            XmlResolver = null,
+                            MaxCharactersInDocument = 16 * 1024 * 1024,
+                        };
+                        using (var reader = XmlReader.Create(ms, settings))
+                        {
+                            this.manifest = (instrumentationManifest)serializer.Deserialize(reader);
+                        }
                     }
                 }
 
@@ -73,10 +103,28 @@
 
         public ushort TotalChunks => this.totalChunks;
 
-        public void AddChunk(string schemaChunk)
+        public void AddChunk(ushort chunkNumber, byte[] schemaChunk)
         {
-            this.chunkBuilder.Append(schemaChunk);
-            ++this.chunksReceived;
+            if (chunkNumber >= this.totalChunks || schemaChunk == null || schemaChunk.Length == 0)
+            {
+                throw new InvalidOperationException("EventSource manifest chunk index or data is invalid.");
+            }
+
+            if (this.chunks.TryGetValue(chunkNumber, out var existing))
+            {
+                if (existing.Length != schemaChunk.Length)
+                {
+                    throw new InvalidOperationException("Conflicting duplicate EventSource manifest chunk.");
+                }
+                for (int i = 0; i < existing.Length; i++)
+                {
+                    if (existing[i] != schemaChunk[i]) throw new InvalidOperationException("Conflicting duplicate EventSource manifest chunk.");
+                }
+            }
+            else
+            {
+                this.chunks.Add(chunkNumber, (byte[])schemaChunk.Clone());
+            }
         }
 
         public override bool Equals(object obj)

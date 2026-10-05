@@ -17,6 +17,12 @@
             this.version = version;
         }
 
+        public Guid ProviderId => this.providerId;
+
+        public ushort Id => this.id;
+
+        public byte Version => this.version;
+
         public bool Equals(TraceEventKey other)
         {
             return this.providerId.Equals(other.providerId) && this.id == other.id && this.version == other.version;

@@ -1,0 +1,31 @@
+name: test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore ETW2JSON.sln --locked-mode
+
+      - name: Build
+        run: dotnet build ETW2JSON.sln -c Release --no-restore
+
+      - name: Test
+        run: dotnet test ETW2JSON.sln -c Release --no-build
+
+      - name: Generate ETL fixtures and run Windows smoke checks
+        shell: pwsh
+        run: |
+          ./tests/fixtures/Verify-EventSourceFixture.ps1 `
+            -OutputDirectory "$env:RUNNER_TEMP/etw2json-fixture-${{ github.run_id }}" `
+            -DotNetPath (Get-Command dotnet).Source

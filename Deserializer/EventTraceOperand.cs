@@ -11,7 +11,7 @@
             this.EventPropertyOperands = operands;
         }
 
-        public int EventMetadataTableIndex { get; }
+        public int EventMetadataTableIndex { get; set; }
 
         public EventMetadata Metadata { get; }
 

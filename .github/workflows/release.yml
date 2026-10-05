@@ -1,0 +1,72 @@
+name: release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  windows-x64:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        shell: bash
+        run: |
+          set -euo pipefail
+          dotnet restore ETW2JSON.sln --locked-mode
+
+      - name: Build and test
+        shell: bash
+        run: |
+          set -euo pipefail
+          dotnet build ETW2JSON.sln -c Release --no-restore
+          dotnet test ETW2JSON.sln -c Release --no-build
+
+      - name: Run native ETW smoke checks
+        shell: pwsh
+        run: |
+          ./tests/fixtures/Verify-EventSourceFixture.ps1 `
+            -OutputDirectory "$env:RUNNER_TEMP/etw2json-release-fixture-${{ github.run_id }}" `
+            -DotNetPath (Get-Command dotnet).Source
+
+      - name: Publish and upload Windows x64 release ZIP
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:RELEASE_TAG -notmatch '^v?(?<version>(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?)$') {
+            throw "Release tag must be a semantic version, optionally prefixed with v: $env:RELEASE_TAG"
+          }
+          $version = $Matches.version
+          $publishDirectory = Join-Path $env:RUNNER_TEMP 'etw2json-publish'
+          $releaseLock = Join-Path $env:RUNNER_TEMP 'etw2json-release.packages.lock.json'
+          $stageDirectory = Join-Path $env:RUNNER_TEMP "etw2json-$version-win-x64"
+          $zipPath = "$stageDirectory.zip"
+          dotnet publish ETW2JSON.csproj -c Release -r win-x64 --self-contained true `
+            -p:Version=$version -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:EnableCompressionInSingleFile=true -p:DebugType=None -p:DebugSymbols=false -p:PublishTrimmed=false `
+            -p:RestorePackagesWithLockFile=true "-p:NuGetLockFilePath=$releaseLock" `
+            -o $publishDirectory
+          if ($LASTEXITCODE -ne 0) { throw "Windows x64 publish failed with exit code $LASTEXITCODE" }
+          & (Join-Path $publishDirectory 'etw2json.exe') --help
+          if ($LASTEXITCODE -ne 0) { throw "Published executable failed with exit code $LASTEXITCODE" }
+          New-Item -ItemType Directory -Path $stageDirectory -Force | Out-Null
+          Copy-Item (Join-Path $publishDirectory 'etw2json.exe') $stageDirectory
+          Copy-Item 'LICENSE' $stageDirectory
+          Copy-Item 'README.md' $stageDirectory
+          Compress-Archive -Path (Join-Path $stageDirectory '*') -DestinationPath $zipPath -Force
+          gh release upload $env:RELEASE_TAG $zipPath --clobber --repo $env:GH_REPO
+          if ($LASTEXITCODE -ne 0) { throw "GitHub release asset upload failed with exit code $LASTEXITCODE" }

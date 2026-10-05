@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<instrumentationManifest xmlns="http://schemas.microsoft.com/win/2004/08/events"
+                         xmlns:win="http://manifests.microsoft.com/win/2004/08/windows/events">
+  <instrumentation>
+    <events>
+      <provider name="ETW2JSON-Manifest-Fixture"
+                guid="{9ab0e68d-70c1-4e5a-938c-1390a31a0002}"
+                symbol="ETW2JSON_MANIFEST_FIXTURE"
+                resourceFileName="ETW2JSON.FixtureEmitter.exe"
+                messageFileName="ETW2JSON.FixtureEmitter.exe">
+        <events>
+          <event value="1" version="1" level="win:Informational" symbol="KnownPayload" template="Payload"/>
+        </events>
+        <templates>
+          <template tid="Payload">
+            <data name="sequence" inType="win:Int32"/>
+            <data name="message" inType="win:UnicodeString"/>
+            <data name="correlation" inType="win:GUID"/>
+          </template>
+        </templates>
+      </provider>
+    </events>
+  </instrumentation>
+</instrumentationManifest>
