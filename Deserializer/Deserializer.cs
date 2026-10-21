@@ -443,6 +443,11 @@
                 identity.WriteByte((byte)effectiveEventId);
                 identity.WriteByte((byte)(effectiveEventId >> 8));
                 identity.WriteByte(eventRecord->Version);
+                // TDH can derive names from the descriptor even when the
+                // TraceLogging schema and provider traits are identical.
+                identity.WriteByte(eventRecord->Opcode);
+                identity.WriteByte((byte)eventRecord->Task);
+                identity.WriteByte((byte)(eventRecord->Task >> 8));
 
                 for (int i = 0; i < eventRecord->ExtendedDataCount; i++)
                 {

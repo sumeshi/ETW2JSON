@@ -86,6 +86,9 @@ namespace ETW2JSON.FixtureEmitter
                 sequence,
                 correlation = Guid.Parse("20000000-0000-0000-0000-" + sequence.ToString("x12")),
             });
+            var activity = new { sequence, message = "trace-activity-" + sequence };
+            this.Write("TLActivity", new EventSourceOptions { Opcode = EventOpcode.Start }, activity);
+            this.Write("TLActivity", new EventSourceOptions { Opcode = EventOpcode.Stop }, activity);
         }
     }
 

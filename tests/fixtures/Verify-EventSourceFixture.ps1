@@ -87,10 +87,11 @@ $expected = @{
             manifest = "etw2json-eventwrite.man"
         }
         @{
-            provider_guid = $traceLoggingGuid; expected_event_count = ($Count * 2); event_names = @("TLAlpha", "TLBeta")
+            provider_guid = $traceLoggingGuid; expected_event_count = ($Count * 4); event_names = @("TLAlpha", "TLBeta", "TLActivity")
             event_schemas = @(
                 @{ name = "TLAlpha"; properties = @(@{ name = "sequence"; type = "Int32" }, @{ name = "message"; type = "UnicodeString" }) }
                 @{ name = "TLBeta"; properties = @(@{ name = "sequence"; type = "Int32" }, @{ name = "correlation"; type = "GUID" }) }
+                @{ name = "TLActivity"; opcodes = @(1, 2); expected_per_opcode = $Count; properties = @(@{ name = "sequence"; type = "Int32" }, @{ name = "message"; type = "UnicodeString" }) }
             )
             manifest = $null
         }
@@ -120,7 +121,14 @@ $generation = @{
 $generation | ConvertTo-Json -Depth 5 | Set-Content -Encoding utf8 (Join-Path $OutputDirectory "generation.json")
 
 function Assert-True([bool] $condition, [string] $message) {
-    if (-not $condition) { throw "Smoke validation failed: $message" }
+    if (-not $condition) {
+        $failure = "Smoke validation failed: $message"
+        if ($env:GITHUB_ACTIONS) {
+            $diagnostic = $failure.Replace('%', '%25').Replace("`r", '%0D').Replace("`n", '%0A')
+            Write-Output "::error title=Windows ETW smoke::$diagnostic"
+        }
+        throw $failure
+    }
 }
 
 function Invoke-Cli([string[]] $arguments) {
@@ -156,6 +164,66 @@ function Assert-ProviderCount($events, [string] $guid, [int] $eventId, [int] $ve
     return ,$matches
 }
 
+function Assert-TraceLoggingActivity($events, [switch] $Legacy, $Expected) {
+    Assert-True ($events.Count -eq ($Count * 2)) "TLActivity record count was $($events.Count), expected $($Count * 2)"
+    $namesByOpcode = @{}
+    $schemaData = $null
+    $descriptorIdentity = $null
+    $traitsData = $null
+    foreach ($opcode in @(1, 2)) {
+        $byOpcode = @($events | Where-Object { $_.event_header.opcode -eq $opcode })
+        Assert-True ($byOpcode.Count -eq $Count) "TLActivity opcode $opcode count was $($byOpcode.Count), expected $Count"
+        $sequences = @()
+        $names = @()
+        foreach ($event in $byOpcode) {
+            $name = if ($Legacy) { $event.Name } else { $event.event_name }
+            $properties = if ($Legacy) { $event.Properties[0] } else { $event.properties }
+            $sequence = [int]$properties.sequence
+            $sequences += $sequence
+            $names += $name
+            Assert-True ($name -cmatch "(^|/)TLActivity(/|$)") "TLActivity task name was lost: $name"
+            Assert-True ($sequence -ge 1 -and $sequence -le $Count) "TLActivity sequence out of range"
+            Assert-True ($properties.message -ceq "trace-activity-$sequence") "TLActivity payload value mismatch"
+            Assert-True ($event.metadata_source -ceq "trace_logging" -and $event.decode_status -ceq "decoded") "TLActivity provenance/status mismatch"
+            Assert-True ($event.source_file -ceq $etl -and $event.event_header.provider_guid -eq $traceLoggingGuid) "TLActivity original source/provider missing"
+            Assert-True ($event.Opcode -eq $opcode) "TLActivity top-level opcode differs from the original header"
+
+            # The self-describing payload is Int32 followed by a UTF-16Z string.
+            # Start/Stop carry exactly the same values and therefore the same bytes.
+            $expectedPayload = [byte[]]([BitConverter]::GetBytes($sequence) + [Text.Encoding]::Unicode.GetBytes("trace-activity-$sequence" + [char]0))
+            Assert-True ($event.raw_payload -ceq [Convert]::ToBase64String($expectedPayload)) "TLActivity raw payload differs from the emitted bytes"
+            $schemas = @($event.raw_extended_data | Where-Object { $_.ext_type -eq 11 })
+            Assert-True ($schemas.Count -eq 1 -and -not [string]::IsNullOrWhiteSpace($schemas[0].raw_data)) "TLActivity schema extension missing"
+            $schemaBytes = [Convert]::FromBase64String($schemas[0].raw_data)
+            Assert-True ($schemaBytes.Length -eq $schemas[0].data_size -and $schemaBytes.Length -gt 2) "TLActivity schema extension length mismatch"
+            Assert-True ([BitConverter]::ToUInt16($schemaBytes, 0) -eq $schemaBytes.Length) "TLActivity schema metadata length mismatch"
+            $currentDescriptor = '{0}:{1}:{2}' -f $event.event_header.provider_guid, $event.event_header.event_id, $event.event_header.version
+            $currentTraits = @($event.raw_extended_data | Where-Object { $_.ext_type -eq 12 } | ForEach-Object { '{0}:{1}' -f $_.data_size, $_.raw_data }) -join '|'
+            if ($null -eq $schemaData) {
+                $schemaData = $schemas[0].raw_data
+                $descriptorIdentity = $currentDescriptor
+                $traitsData = $currentTraits
+            }
+            Assert-True ($schemas[0].raw_data -ceq $schemaData) "TLActivity Start/Stop schema extension bytes differ"
+            Assert-True ($currentDescriptor -ceq $descriptorIdentity) "TLActivity Start/Stop provider/event ID/version differ; the fixture no longer exercises shared-identity cache entries"
+            Assert-True ($currentTraits -ceq $traitsData) "TLActivity Start/Stop provider traits differ; the fixture no longer isolates descriptor changes"
+        }
+        $names = @($names | Sort-Object -CaseSensitive -Unique)
+        Assert-True ($names.Count -eq 1) "TLActivity name was not stable within opcode $opcode"
+        $namesByOpcode[$opcode] = $names[0]
+        Assert-True ((@($sequences | Sort-Object) -join ',') -ceq ((1..$Count) -join ',')) "TLActivity opcode $opcode sequence set mismatch"
+        if ($null -ne $Expected) {
+            Assert-True ($namesByOpcode[$opcode] -ceq $Expected.NamesByOpcode[$opcode]) "TLActivity name/opcode mapping differs between JSONL and legacy JSON"
+        }
+    }
+    Assert-True ($namesByOpcode[1] -cne $namesByOpcode[2]) "TLActivity Start and Stop reused one decorated event name"
+    if ($null -ne $Expected) {
+        Assert-True ($schemaData -ceq $Expected.SchemaData) "TLActivity schema extension differs between JSONL and legacy JSON"
+        Assert-True ($descriptorIdentity -ceq $Expected.DescriptorIdentity -and $traitsData -ceq $Expected.TraitsData) "TLActivity event identity/traits differ between JSONL and legacy JSON"
+    }
+    return [pscustomobject]@{ NamesByOpcode = $namesByOpcode; SchemaData = $schemaData; DescriptorIdentity = $descriptorIdentity; TraitsData = $traitsData }
+}
+
 $defaultPath = Join-Path $OutputDirectory "default.jsonl"
 $manifestPath = Join-Path $OutputDirectory "with-manifest.jsonl"
 $legacyPath = Join-Path $OutputDirectory "legacy.json"
@@ -170,7 +238,7 @@ $defaultEvents = Read-JsonLines $defaultPath
 $eventSourceEvents = Assert-ProviderCount $defaultEvents $eventSourceGuid 1 0 $Count
 $eventWriteMissing = Assert-ProviderCount $defaultEvents $eventWriteGuid 1 1 $Count
 $traceLoggingEvents = @($defaultEvents | Where-Object { $_.provider_guid -eq $traceLoggingGuid })
-Assert-True ($traceLoggingEvents.Count -eq ($Count * 2)) "TraceLogging record count was $($traceLoggingEvents.Count), expected $($Count * 2)"
+Assert-True ($traceLoggingEvents.Count -eq ($Count * 4)) "TraceLogging record count was $($traceLoggingEvents.Count), expected $($Count * 4)"
 $traceAlpha = @($traceLoggingEvents | Where-Object { $_.event_name -match "(^|/)TLAlpha(/|$)" })
 $traceBeta = @($traceLoggingEvents | Where-Object { $_.event_name -match "(^|/)TLBeta(/|$)" })
 Assert-True ($traceAlpha.Count -eq $Count -and $traceBeta.Count -eq $Count) "TraceLogging schema cache did not distinguish TLAlpha and TLBeta"
@@ -190,6 +258,8 @@ $alphaSequences = @($traceAlpha | ForEach-Object { [int]$_.properties.sequence }
 $betaSequences = @($traceBeta | ForEach-Object { [int]$_.properties.sequence } | Sort-Object)
 Assert-True (($alphaSequences -join ",") -eq ((1..$Count) -join ",")) "TraceLogging TLAlpha sequence set mismatch"
 Assert-True (($betaSequences -join ",") -eq ((1..$Count) -join ",")) "TraceLogging TLBeta sequence set mismatch"
+$traceActivity = @($traceLoggingEvents | Where-Object { $_.event_name -cmatch "(^|/)TLActivity(/|$)" })
+$activityContract = Assert-TraceLoggingActivity $traceActivity
 
 foreach ($event in $eventSourceEvents) {
     $sequence = [int]$event.properties.sequence
@@ -249,6 +319,10 @@ Assert-True ($legacyManifestEvents[0].metadata_source -eq "external_manifest") "
 Assert-True ($legacyManifestEvents[0].source_file -eq $etl) "legacy source_file missing"
 Assert-True (-not [string]::IsNullOrWhiteSpace($legacyManifestEvents[0].raw_payload)) "legacy raw_payload missing"
 Assert-True ($legacyManifestEvents[0].metadata_provenance -like "man:*") "legacy metadata provenance missing"
+$legacyTraceEvents = @($legacyEvents | ForEach-Object { $_.Event } | Where-Object { $_.ProviderGuid -eq $traceLoggingGuid })
+Assert-True ($legacyTraceEvents.Count -eq ($Count * 4)) "legacy TraceLogging count mismatch"
+$legacyActivity = @($legacyTraceEvents | Where-Object { $_.Name -cmatch "(^|/)TLActivity(/|$)" })
+$null = Assert-TraceLoggingActivity $legacyActivity -Legacy -Expected $activityContract
 
 $run = Invoke-Cli @($etl, "--scan", "--format", "json", "--output", $scanDefaultPath)
 Assert-True ($run.ExitCode -eq 0) "scan without manifest failed: $($run.Stderr)"
@@ -259,6 +333,11 @@ $scanTraceEvents = @($scanDefault.Providers | Where-Object { $_.provider_guid -e
 foreach ($event in @($traceAlpha[0], $traceBeta[0])) {
     $scanTrace = @($scanTraceEvents | Where-Object { $_.event_id -eq $event.event_id -and $_.version -eq $event.version })
     Assert-True ($scanTrace.Count -eq 1 -and $scanTrace[0].count -eq $Count -and $scanTrace[0].metadata_status -eq "Resolved") "scan TraceLogging count/status mismatch for $($event.event_name)"
+}
+foreach ($group in @($traceActivity | Group-Object -Property event_id, version)) {
+    $event = $group.Group[0]
+    $scanActivity = @($scanTraceEvents | Where-Object { $_.event_id -eq $event.event_id -and $_.version -eq $event.version })
+    Assert-True ($scanActivity.Count -eq 1 -and $scanActivity[0].count -eq $group.Count -and $scanActivity[0].metadata_status -eq "Resolved") "scan TLActivity count/status mismatch"
 }
 
 $run = Invoke-Cli @($etl, "--scan", "--format", "json", "--manifest", $eventWriteManifest, "--output", $scanManifestPath)
@@ -295,4 +374,18 @@ Assert-True ($run.ExitCode -eq 2) "same-input output overwrite was not rejected 
 $afterHash = (Get-FileHash -Algorithm SHA256 $etl).Hash
 Assert-True ($afterHash -eq $beforeHash) "the source ETL hash changed during the smoke run"
 
-Write-Host "ETW2JSON Windows smoke passed for $Count records per manifest/EventSource provider and $($Count * 2) TraceLogging records."
+$activityResult = [ordered]@{
+    checked_formats = @('jsonl', 'legacy_json')
+    records_per_opcode = $Count
+    names_by_opcode = [ordered]@{ '1' = $activityContract.NamesByOpcode[1]; '2' = $activityContract.NamesByOpcode[2] }
+    shared_provider_id_version = $activityContract.DescriptorIdentity
+    shared_provider_traits = $activityContract.TraitsData
+    shared_schema_base64 = $activityContract.SchemaData
+    emitted_payloads_matched = $true
+}
+$activityResult | ConvertTo-Json -Depth 4 | Set-Content -Encoding utf8 (Join-Path $OutputDirectory 'tracelogging-descriptor-validation.json')
+if ($env:GITHUB_ACTIONS) {
+    $diagnostic = ($activityResult | ConvertTo-Json -Depth 4 -Compress).Replace('%', '%25').Replace("`r", '%0D').Replace("`n", '%0A')
+    Write-Output "::notice title=TraceLogging descriptor cache::$diagnostic"
+}
+Write-Host "ETW2JSON Windows smoke passed for $Count records per manifest/EventSource provider and $($Count * 4) TraceLogging records, including same-schema Start/Stop name checks."
