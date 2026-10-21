@@ -328,6 +328,8 @@ The script generates repository-owned EventSource, EventWrite, and TraceLogging
 events in a temporary ETW session; checks default/external-manifest/static-PE
 conversion, scan and missing reports, expected counts and values, raw payloads,
 and ETL hashes; and removes the session. Generated ETL files remain local.
+It also checks that identical TraceLogging schemas retain distinct START/STOP
+event names in JSONL and legacy JSON.
 Both CI workflows include this check. Its existence or a portable unit-test pass
 does not establish that it ran successfully on the current build or that
 real-world evidence has equivalent coverage.

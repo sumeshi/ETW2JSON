@@ -62,6 +62,11 @@ The second review found and addressed the following problems:
   corrected, and malformed/extra payload is retained as a decoding error.
 - TraceLogging provider traits used the wrong extension type constant (`0xD`
   rather than Windows' `0xC`), affecting schema identity and validation.
+- The final acceptance review found that identical TraceLogging schemas could
+  share cached event names across different START/STOP opcodes. Cache identity
+  now also includes opcode and the full 16-bit task. Both output formats have
+  regression checks for distinct names, unchanged original data and reuse of a
+  repeated descriptor's cache entry.
 - Trace loss counters were ignored. Collection loss now emits a source-specific
   warning; the missing events cannot be recovered by conversion.
 - SID/session/schema/unknown extended-data bytes were discarded. They are now
@@ -204,6 +209,26 @@ The actual public check summaries, complete counters and sampled diagnostics are
 saved in [Windows results](validation-results/windows/README.md). Full outputs,
 hashes and reports are attached to the linked CI run with 14-day artifact
 retention. The saved summaries are not copies of the complete artifacts.
+
+### Final acceptance check
+
+The [Windows acceptance run at `c2149b0`](https://github.com/sumeshi/ETW2JSON/actions/runs/39575882804)
+passed all **251 unit tests**, 102 validator self-checks, 27 corpus-contract
+checks and every native corpus case above with the same checked counts and zero
+raw or semantic mismatches. The two negative cases remain semantic-incomplete.
+
+The expanded Windows fixture emitted four START and four STOP records with the
+same provider, event ID **158**, version **0**, schema bytes and provider traits.
+Both JSONL and legacy JSON retained the emitted payload values/bytes and mapped
+opcode 1 to `ETW2JSON-TraceLogging-Fixture/TLActivity/Opcode(1)` and opcode 2 to
+`ETW2JSON-TraceLogging-Fixture/TLActivity/Opcode(2)`. The checks require distinct
+names and stable mapping when a descriptor repeats. Task differences, including
+the high byte, are additionally tested with an injected TDH response.
+
+The actual [acceptance summaries](validation-results/windows/acceptance-check-summaries.json)
+preserve those native assertions and the repeated corpus results. This resolves
+the final review finding within the documented coverage; it does not extend
+support to the unvalidated event families below.
 
 These results support scoped extraction of the checked process/module/name
 layouts and metadata recovery work. They do not establish a general Windows

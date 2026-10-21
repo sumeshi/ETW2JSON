@@ -24,3 +24,14 @@ limits, and the [validator instructions](../../../tests/ETW2JSON.NativeValidatio
 for reproduction. Both native consumers use the Windows ETW container reader;
 the [portable Dissect comparison](../portable/README.md) provides a separate
 container implementation for its documented scope.
+
+## Final acceptance run
+
+[`acceptance-check-summaries.json`](acceptance-check-summaries.json) records the
+successful [run at `c2149b0`](https://github.com/sumeshi/ETW2JSON/actions/runs/39575882804)
+after correcting descriptor-dependent TraceLogging name caching. It includes the
+same five public corpus cases and the generated fixture's same-schema START/
+STOP assertions in JSONL and legacy JSON. The run passed 251 unit tests, 102
+validator self-checks and 27 corpus-contract checks. Its complete artifact is
+`etw2json-validation-39575882804`, also retained for 14 days. The compact-summary
+limitations above apply to this file as well.

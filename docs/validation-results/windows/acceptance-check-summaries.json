@@ -1,0 +1,443 @@
+{
+  "scope": "Final acceptance run after fixing TraceLogging descriptor-dependent event-name caching. Compact public annotations contain complete comparison counters and sampled diagnostics; complete artifacts are separate.",
+  "commit": "c2149b01af72c82ada61348538cbac4221cc2555",
+  "run_url": "https://github.com/sumeshi/ETW2JSON/actions/runs/39575882804",
+  "job_url": "https://github.com/sumeshi/ETW2JSON/actions/runs/39575882804/job/119141162566",
+  "summary_source_url": "https://github.com/sumeshi/ETW2JSON/actions/runs/39575882804/annotations_partial",
+  "retrieved_utc": "2026-10-21T09:21:28.030105+00:00",
+  "summary_limitations": [
+    "These are compact public annotations, not full comparison.json files or unit-test logs.",
+    "Positive semantic cases cover supported mapped fields. The two negative cases explicitly have no semantic comparisons.",
+    "The same-schema fixture asserts shared provider/event ID/version/schema/traits, emitted payloads, name separation by opcode and JSONL/legacy consistency. It does not establish all provider/version behavior."
+  ],
+  "job_steps": [
+    {
+      "name": "Set up job",
+      "conclusion": "success"
+    },
+    {
+      "name": "Run actions/checkout@v4",
+      "conclusion": "success"
+    },
+    {
+      "name": "Run actions/setup-dotnet@v4",
+      "conclusion": "success"
+    },
+    {
+      "name": "Restore",
+      "conclusion": "success"
+    },
+    {
+      "name": "Build",
+      "conclusion": "success"
+    },
+    {
+      "name": "Test",
+      "conclusion": "success"
+    },
+    {
+      "name": "Build independent Windows validator",
+      "conclusion": "success"
+    },
+    {
+      "name": "Generate ETL fixtures and run Windows smoke checks",
+      "conclusion": "success"
+    },
+    {
+      "name": "Compare public ETL corpus with independent readers",
+      "conclusion": "success"
+    },
+    {
+      "name": "Retain validation evidence",
+      "conclusion": "success"
+    },
+    {
+      "name": "Post Run actions/setup-dotnet@v4",
+      "conclusion": "success"
+    },
+    {
+      "name": "Post Run actions/checkout@v4",
+      "conclusion": "success"
+    },
+    {
+      "name": "Complete job",
+      "conclusion": "success"
+    }
+  ],
+  "same_schema_tracelogging_start_stop": {
+    "checked_formats": [
+      "jsonl",
+      "legacy_json"
+    ],
+    "records_per_opcode": 4,
+    "names_by_opcode": {
+      "1": "ETW2JSON-TraceLogging-Fixture/TLActivity/Opcode(1)",
+      "2": "ETW2JSON-TraceLogging-Fixture/TLActivity/Opcode(2)"
+    },
+    "shared_provider_id_version": "4c5b5fd0-7bb4-457a-ad3f-6da89e7f0003:158:0",
+    "shared_provider_traits": "32:IABFVFcySlNPTi1UcmFjZUxvZ2dpbmctRml4dHVyZQA=",
+    "shared_schema_base64": "IQAAVExBY3Rpdml0eQBzZXF1ZW5jZQAHbWVzc2FnZQAB",
+    "emitted_payloads_matched": true
+  },
+  "cases": [
+    {
+      "case": "gcevents-with-manifest",
+      "harness_exit_code": 0,
+      "comparison_summary": {
+        "outcome": "passed_with_limits",
+        "validation_class": "semantic_comparison_subset",
+        "semantic_validation_completed": true,
+        "contract_errors": [],
+        "cli_exit_code": 0,
+        "execution_error": null,
+        "raw": {
+          "native_records": 71,
+          "cli_records": 71,
+          "mismatched_records": 0,
+          "mismatch_fields": {}
+        },
+        "semantic": {
+          "trace_event_records": 71,
+          "matched_to_native": 71,
+          "unmatched_to_native": 0,
+          "native_records_without_reference_match": 0,
+          "native_records_evicted_from_matching_window": 0,
+          "peak_buffered_native_records": 71,
+          "reference_record_count_difference": 0,
+          "reference_pid_tid_fixup_matches": 0,
+          "reference_displaced_ordinal_matches": 0,
+          "reference_known_payload_records": 71,
+          "compared_records": 22,
+          "compared_fields": 49,
+          "mismatching_fields": 0,
+          "reference_unsigned_reinterpretations": 0,
+          "reference_reported_events_lost": 0,
+          "skipped_records": {
+            "reference_has_fields_application_not_decoded": 49
+          },
+          "skipped_fields": {
+            "static_parser_field_name_not_present_in_application": 6
+          },
+          "application_not_decoded_reasons": {
+            "metadata_missing: Event manifests do not supply classic/MOF class schemas; recover embedded trace metadata or the matching MOF definitions.": 2,
+            "unsupported: Manifest arrays, maps, lengths, and output formatting are not decoded; the raw payload is retained.": 14,
+            "metadata_missing: No supplied manifest contains a matching provider/event/version.": 33
+          }
+        },
+        "diagnostics": [
+          {
+            "phase": "application_coverage",
+            "ordinal": 1,
+            "field": "provider=68fdd900-4a3e-11d1-84f4-0000f80464e3; decode_note",
+            "reference": "application decode_status=decoded",
+            "actual": "decode_status=metadata_missing; metadata_source=unknown; decode_note=Event manifests do not supply classic/MOF class schemas; recover embedded trace metadata or the matching MOF definitions."
+          },
+          {
+            "phase": "application_coverage",
+            "ordinal": 3,
+            "field": "provider=e13c0d23-ccbc-4e12-931b-d9cc2eee27e4; decode_note",
+            "reference": "application decode_status=decoded",
+            "actual": "decode_status=unsupported; metadata_source=external_manifest; decode_note=Manifest arrays, maps, lengths, and output formatting are not decoded; the raw payload is retained."
+          },
+          {
+            "phase": "application_coverage",
+            "ordinal": 12,
+            "field": "provider=e13c0d23-ccbc-4e12-931b-d9cc2eee27e4; decode_note",
+            "reference": "application decode_status=decoded",
+            "actual": "decode_status=metadata_missing; metadata_source=unknown; decode_note=No supplied manifest contains a matching provider/event/version."
+          }
+        ]
+      }
+    },
+    {
+      "case": "gcevents-without-metadata",
+      "harness_exit_code": 4,
+      "comparison_summary": {
+        "outcome": "raw_match_semantic_comparison_incomplete",
+        "validation_class": "expected_metadata_missing",
+        "semantic_validation_completed": false,
+        "contract_errors": [],
+        "cli_exit_code": 0,
+        "execution_error": null,
+        "raw": {
+          "native_records": 71,
+          "cli_records": 71,
+          "mismatched_records": 0,
+          "mismatch_fields": {}
+        },
+        "semantic": {
+          "trace_event_records": 71,
+          "matched_to_native": 71,
+          "unmatched_to_native": 0,
+          "native_records_without_reference_match": 0,
+          "native_records_evicted_from_matching_window": 0,
+          "peak_buffered_native_records": 71,
+          "reference_record_count_difference": 0,
+          "reference_pid_tid_fixup_matches": 0,
+          "reference_displaced_ordinal_matches": 0,
+          "reference_known_payload_records": 71,
+          "compared_records": 0,
+          "compared_fields": 0,
+          "mismatching_fields": 0,
+          "reference_unsigned_reinterpretations": 0,
+          "reference_reported_events_lost": 0,
+          "skipped_records": {
+            "reference_has_fields_application_not_decoded": 71
+          },
+          "skipped_fields": {},
+          "application_not_decoded_reasons": {
+            "metadata_missing: No matching metadata source was found.": 71
+          }
+        },
+        "diagnostics": [
+          {
+            "phase": "application_coverage",
+            "ordinal": 1,
+            "field": "provider=68fdd900-4a3e-11d1-84f4-0000f80464e3; decode_note",
+            "reference": "application decode_status=decoded",
+            "actual": "decode_status=metadata_missing; metadata_source=unknown; decode_note=No matching metadata source was found."
+          },
+          {
+            "phase": "application_coverage",
+            "ordinal": 3,
+            "field": "provider=e13c0d23-ccbc-4e12-931b-d9cc2eee27e4; decode_note",
+            "reference": "application decode_status=decoded",
+            "actual": "decode_status=metadata_missing; metadata_source=unknown; decode_note=No matching metadata source was found."
+          }
+        ]
+      }
+    },
+    {
+      "case": "kernel-clr-with-manifest",
+      "harness_exit_code": 0,
+      "comparison_summary": {
+        "outcome": "passed_with_limits",
+        "validation_class": "semantic_comparison_subset",
+        "semantic_validation_completed": true,
+        "contract_errors": [],
+        "cli_exit_code": 0,
+        "execution_error": null,
+        "raw": {
+          "native_records": 176217,
+          "cli_records": 176217,
+          "mismatched_records": 0,
+          "mismatch_fields": {}
+        },
+        "semantic": {
+          "trace_event_records": 176217,
+          "matched_to_native": 172703,
+          "unmatched_to_native": 3514,
+          "native_records_without_reference_match": 3514,
+          "native_records_evicted_from_matching_window": 3456,
+          "peak_buffered_native_records": 128,
+          "reference_record_count_difference": 0,
+          "reference_pid_tid_fixup_matches": 122340,
+          "reference_displaced_ordinal_matches": 0,
+          "reference_known_payload_records": 162494,
+          "compared_records": 17212,
+          "compared_fields": 50967,
+          "mismatching_fields": 0,
+          "reference_unsigned_reinterpretations": 4,
+          "reference_reported_events_lost": 0,
+          "skipped_records": {
+            "reference_has_fields_application_not_decoded": 144994,
+            "reference_not_matched_within_bounded_window": 1230,
+            "reference_has_no_decoded_fields": 10209,
+            "no_common_comparable_fields": 288,
+            "ambiguous_reference_to_native_mapping": 2284
+          },
+          "skipped_fields": {
+            "static_parser_field_name_not_present_in_application": 6028
+          },
+          "application_not_decoded_reasons": {
+            "metadata_missing: Event manifests do not supply classic/MOF class schemas; recover embedded trace metadata or the matching MOF definitions.": 125044,
+            "partial: Recognized embedded KernelTraceControl schema metadata record; original bytes are retained.": 11,
+            "partial: Recognized EventSource metadata manifest chunk; original bytes are retained. The target manifest may still be incomplete.": 2,
+            "unsupported: TDH event maps are not resolved by this decoder; the event is retained as raw payload.": 5,
+            "unsupported: Manifest arrays, maps, lengths, and output formatting are not decoded; the raw payload is retained.": 23769,
+            "decode_error: InvalidOperationException: Event payload has 425 unconsumed bytes; the schema does not describe the complete payload.": 271
+          }
+        },
+        "diagnostics": [
+          {
+            "phase": "application_coverage",
+            "ordinal": 1,
+            "field": "provider=68fdd900-4a3e-11d1-84f4-0000f80464e3; decode_note",
+            "reference": "application decode_status=decoded",
+            "actual": "decode_status=metadata_missing; metadata_source=unknown; decode_note=Event manifests do not supply classic/MOF class schemas; recover embedded trace metadata or the matching MOF definitions."
+          },
+          {
+            "phase": "application_coverage",
+            "ordinal": 3,
+            "field": "provider=9b79ee91-b5fd-41c0-a243-4248e266e9d0; decode_note",
+            "reference": "application decode_status=decoded",
+            "actual": "decode_status=metadata_missing; metadata_source=unknown; decode_note=Event manifests do not supply classic/MOF class schemas; recover embedded trace metadata or the matching MOF definitions."
+          },
+          {
+            "phase": "application_coverage",
+            "ordinal": 15,
+            "field": "provider=01853a65-418f-4f36-aefc-dc0f1d2fd235; decode_note",
+            "reference": "application decode_status=decoded",
+            "actual": "decode_status=metadata_missing; metadata_source=unknown; decode_note=Event manifests do not supply classic/MOF class schemas; recover embedded trace metadata or the matching MOF definitions."
+          },
+          {
+            "phase": "application_coverage",
+            "ordinal": 18,
+            "field": "provider=3d6fa8d1-fe05-11d0-9dda-00c04fd7ba7c; decode_note",
+            "reference": "application decode_status=decoded",
+            "actual": "decode_status=metadata_missing; metadata_source=unknown; decode_note=Event manifests do not supply classic/MOF class schemas; recover embedded trace metadata or the matching MOF definitions."
+          }
+        ]
+      }
+    },
+    {
+      "case": "primitive-types",
+      "harness_exit_code": 0,
+      "comparison_summary": {
+        "outcome": "passed_with_limits",
+        "validation_class": "semantic_comparison_subset",
+        "semantic_validation_completed": true,
+        "contract_errors": [],
+        "cli_exit_code": 0,
+        "execution_error": null,
+        "raw": {
+          "native_records": 7,
+          "cli_records": 7,
+          "mismatched_records": 0,
+          "mismatch_fields": {}
+        },
+        "semantic": {
+          "trace_event_records": 7,
+          "matched_to_native": 7,
+          "unmatched_to_native": 0,
+          "native_records_without_reference_match": 0,
+          "native_records_evicted_from_matching_window": 0,
+          "peak_buffered_native_records": 7,
+          "reference_record_count_difference": 0,
+          "reference_pid_tid_fixup_matches": 0,
+          "reference_displaced_ordinal_matches": 0,
+          "reference_known_payload_records": 7,
+          "compared_records": 5,
+          "compared_fields": 55,
+          "mismatching_fields": 0,
+          "reference_unsigned_reinterpretations": 5,
+          "reference_reported_events_lost": 0,
+          "skipped_records": {
+            "reference_has_fields_application_not_decoded": 2
+          },
+          "skipped_fields": {
+            "unspecified_reference_datetime_zone": 5
+          },
+          "application_not_decoded_reasons": {
+            "metadata_missing: No matching metadata source was found.": 2
+          }
+        },
+        "diagnostics": [
+          {
+            "phase": "application_coverage",
+            "ordinal": 1,
+            "field": "provider=68fdd900-4a3e-11d1-84f4-0000f80464e3; decode_note",
+            "reference": "application decode_status=decoded",
+            "actual": "decode_status=metadata_missing; metadata_source=unknown; decode_note=No matching metadata source was found."
+          },
+          {
+            "phase": "reference_representation",
+            "ordinal": 3,
+            "field": "int64_type",
+            "reference": "TraceEvent signed value=-204",
+            "actual": "metadata declares unsigned scalar; value=18446744073709551412"
+          },
+          {
+            "phase": "reference_representation",
+            "ordinal": 4,
+            "field": "int64_type",
+            "reference": "TraceEvent signed value=-380",
+            "actual": "metadata declares unsigned scalar; value=18446744073709551236"
+          },
+          {
+            "phase": "reference_representation",
+            "ordinal": 5,
+            "field": "int64_type",
+            "reference": "TraceEvent signed value=-260",
+            "actual": "metadata declares unsigned scalar; value=18446744073709551356"
+          }
+        ]
+      }
+    },
+    {
+      "case": "self-describing",
+      "harness_exit_code": 4,
+      "comparison_summary": {
+        "outcome": "raw_match_semantic_comparison_incomplete",
+        "validation_class": "expected_unsupported_fallback",
+        "semantic_validation_completed": false,
+        "contract_errors": [],
+        "cli_exit_code": 0,
+        "execution_error": null,
+        "raw": {
+          "native_records": 23,
+          "cli_records": 23,
+          "mismatched_records": 0,
+          "mismatch_fields": {}
+        },
+        "semantic": {
+          "trace_event_records": 23,
+          "matched_to_native": 21,
+          "unmatched_to_native": 2,
+          "native_records_without_reference_match": 2,
+          "native_records_evicted_from_matching_window": 0,
+          "peak_buffered_native_records": 23,
+          "reference_record_count_difference": 0,
+          "reference_pid_tid_fixup_matches": 0,
+          "reference_displaced_ordinal_matches": 0,
+          "reference_known_payload_records": 17,
+          "compared_records": 0,
+          "compared_fields": 0,
+          "mismatching_fields": 0,
+          "reference_unsigned_reinterpretations": 0,
+          "reference_reported_events_lost": 0,
+          "skipped_records": {
+            "reference_has_fields_application_not_decoded": 17,
+            "ambiguous_reference_to_native_mapping": 2,
+            "reference_has_no_decoded_fields": 4
+          },
+          "skipped_fields": {},
+          "application_not_decoded_reasons": {
+            "metadata_missing: No matching metadata source was found.": 22,
+            "unsupported: TDH struct properties are retained as raw payload because nested layouts are not supported safely.": 1
+          }
+        },
+        "diagnostics": [
+          {
+            "phase": "application_coverage",
+            "ordinal": 1,
+            "field": "provider=68fdd900-4a3e-11d1-84f4-0000f80464e3; decode_note",
+            "reference": "application decode_status=decoded",
+            "actual": "decode_status=metadata_missing; metadata_source=unknown; decode_note=No matching metadata source was found."
+          },
+          {
+            "phase": "application_coverage",
+            "ordinal": 4,
+            "field": "provider=9b79ee91-b5fd-41c0-a243-4248e266e9d0; decode_note",
+            "reference": "application decode_status=decoded",
+            "actual": "decode_status=metadata_missing; metadata_source=unknown; decode_note=No matching metadata source was found."
+          },
+          {
+            "phase": "application_coverage",
+            "ordinal": 17,
+            "field": "provider=a61ea624-4944-55fc-c2a8-37838829438d; decode_note",
+            "reference": "application decode_status=decoded",
+            "actual": "decode_status=unsupported; metadata_source=trace_logging; decode_note=TDH struct properties are retained as raw payload because nested layouts are not supported safely."
+          },
+          {
+            "phase": "application_coverage",
+            "ordinal": 19,
+            "field": "provider=ed54dff8-c409-4cf6-bf83-05e1e61a09c4; decode_note",
+            "reference": "application decode_status=decoded",
+            "actual": "decode_status=metadata_missing; metadata_source=unknown; decode_note=No matching metadata source was found."
+          }
+        ]
+      }
+    }
+  ]
+}
