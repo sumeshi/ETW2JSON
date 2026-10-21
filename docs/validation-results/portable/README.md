@@ -25,6 +25,17 @@ and pinned dependencies are in the
 | `stacks-comparison.json` | Match IDs and 19,660 addresses in 374 stack records, independently read from extension bytes. |
 | `empty-template-error-comparison.json` | All 271 incomplete-schema records retain manifest provenance and report all 425 payload bytes as unconsumed. They remain decoding errors. |
 
+An additional check at **2026-10-21 08:34:28 UTC** is saved in
+[`image-timestamp-reference-comparison.json`](image-timestamp-reference-comparison.json).
+The [official Image_Load MOF reference](https://learn.microsoft.com/en-us/windows/win32/etw/image-load)
+and Dissect's v2 schema both declare `TimeDateStamp` as UInt32. In all four
+selected records, raw bytes `82fc1699` at offset 24 decode to **2,568,420,482**,
+matching the independent oracle and application output; TraceEvent 4.0.0's
+static `Int32` property represents those same bits as **−1,726,546,814**. The
+report pins the official documentation source commit, schema hash, raw record
+indices, and existing replay output hash. This supplements the original replay;
+its source commit and assembly hashes in `index.json` are unchanged.
+
 All comparisons above have zero mismatches. Coverage limits and unsupported
 records remain visible in the reports; matching raw bytes alone does not verify
 decoded properties. None of these inputs contains TraceLogging metadata; the

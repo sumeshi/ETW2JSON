@@ -1,0 +1,135 @@
+{
+  "scope": "Additional independent UInt32 declaration and raw-byte check for the four high-bit classic Image v2 TimeDateStamp values. This does not rerun native ETL reading or broaden supported layouts.",
+  "checked_utc": "2026-10-21T08:34:28.155670+00:00",
+  "source_etl": {
+    "name": "net.4.5.x86.etl",
+    "sha256": "2517f70d16d4139a5ed0bd1219b1637cd09439fa517ecad2f56914d0b1393b89",
+    "repository": "https://github.com/microsoft/perfview",
+    "commit": "29b21620a6c295979e83dc99008262ad2f3c6a2d",
+    "license": "MIT"
+  },
+  "official_mof_reference": {
+    "documentation_url": "https://learn.microsoft.com/en-us/windows/win32/etw/image-load",
+    "source_repository": "https://github.com/MicrosoftDocs/win32",
+    "source_commit": "ca8274decead49403d70ceeed4af8d4ca74eaf11",
+    "source_path": "desktop-src/ETW/image-load.md",
+    "source_url": "https://github.com/MicrosoftDocs/win32/blob/ca8274decead49403d70ceeed4af8d4ca74eaf11/desktop-src/ETW/image-load.md",
+    "source_sha256": "3b47de167431dab1eb0f086144435027ae1ab6b27b422b3806a686f4c7cb2b5a",
+    "class": "Image_Load",
+    "event_type_values": [
+      10,
+      2,
+      3,
+      4
+    ],
+    "field": "TimeDateStamp",
+    "declared_type": "uint32",
+    "retrieval_note": "The Learn endpoint returned proxy HTTP 403; the official MicrosoftDocs source was retrieved over verified HTTPS at the pinned commit."
+  },
+  "independent_reference_schema": {
+    "external_tool": "dissect.etl 3.14",
+    "manifest_filename": "{2cb15d1d-5fc1-11d2-abe1-00a0c911f518}.xml",
+    "manifest_sha256": "9a128c4e9240d4a5e742f53a0d0c5a008866a3abab3fb329951685f07284b6b5",
+    "provider_guid": "2cb15d1d-5fc1-11d2-abe1-00a0c911f518",
+    "template": "Image_Load_V2",
+    "field": "TimeDateStamp",
+    "declared_type": "win:UInt32",
+    "version": 2,
+    "classic_opcodes": [
+      10,
+      2,
+      3,
+      4
+    ]
+  },
+  "reference_representation_difference": {
+    "reference_library": "Microsoft.Diagnostics.Tracing.TraceEvent 4.0.0",
+    "source_commit": "10e5d271cebcdf5d6cf122c6ab9c863860a7a2f1",
+    "source_url": "https://github.com/microsoft/perfview/blob/10e5d271cebcdf5d6cf122c6ab9c863860a7a2f1/src/TraceEvent/Parsers/KernelTraceEventParser.cs#L7516",
+    "static_parser": "ImageLoadTraceData.TimeDateStamp",
+    "static_return_type": "System.Int32",
+    "read_expression": "GetInt32At(HostOffset(16, 2))",
+    "explanation": "The published field is unsigned; the static reference parser returns the same 32 bits as a signed int. At pointer width 8 its payload offset is 24. No field-name-based or global signedness inference is justified."
+  },
+  "existing_replay_artifact": {
+    "summary": "full-clr-manifest.summary.json",
+    "original_output_sha256": "62dba8d7bd0d8516f82f84f9453d9e0a98eeb6210afc5b262ec1e836c38d4ac1",
+    "note": "Application values are read from the original saved replay output. The existing replay index source commit and assembly hashes are unchanged."
+  },
+  "checked_records": 4,
+  "mismatched_records": 0,
+  "records": [
+    {
+      "record_index": 52965,
+      "reference_symbol": "Image/Load",
+      "header_event_id": 0,
+      "version": 2,
+      "opcode": 10,
+      "pointer_width_bytes": 8,
+      "payload_length": 266,
+      "payload_sha256": "60d63d6a399162c8e7d1deb833957f33332e4c248dd0e0a6e53592dc0a8e4852",
+      "field_offset_bytes": 24,
+      "field_bytes_hex": "82fc1699",
+      "raw_little_endian_uint32": 2568420482,
+      "same_bits_as_int32": -1726546814,
+      "independent_dissect_uint32": 2568420482,
+      "application_decoded_uint32": 2568420482,
+      "identity_and_payload_match": true,
+      "all_checks_match": true
+    },
+    {
+      "record_index": 52990,
+      "reference_symbol": "Image/UnLoad",
+      "header_event_id": 0,
+      "version": 2,
+      "opcode": 2,
+      "pointer_width_bytes": 8,
+      "payload_length": 266,
+      "payload_sha256": "60d63d6a399162c8e7d1deb833957f33332e4c248dd0e0a6e53592dc0a8e4852",
+      "field_offset_bytes": 24,
+      "field_bytes_hex": "82fc1699",
+      "raw_little_endian_uint32": 2568420482,
+      "same_bits_as_int32": -1726546814,
+      "independent_dissect_uint32": 2568420482,
+      "application_decoded_uint32": 2568420482,
+      "identity_and_payload_match": true,
+      "all_checks_match": true
+    },
+    {
+      "record_index": 54021,
+      "reference_symbol": "Image/Load",
+      "header_event_id": 0,
+      "version": 2,
+      "opcode": 10,
+      "pointer_width_bytes": 8,
+      "payload_length": 266,
+      "payload_sha256": "0f4e6754e39d5d947f57a9b4e7716ad6cd73a268aa6a7f101d91e9d11823ce78",
+      "field_offset_bytes": 24,
+      "field_bytes_hex": "82fc1699",
+      "raw_little_endian_uint32": 2568420482,
+      "same_bits_as_int32": -1726546814,
+      "independent_dissect_uint32": 2568420482,
+      "application_decoded_uint32": 2568420482,
+      "identity_and_payload_match": true,
+      "all_checks_match": true
+    },
+    {
+      "record_index": 126458,
+      "reference_symbol": "Image/UnLoad",
+      "header_event_id": 0,
+      "version": 2,
+      "opcode": 2,
+      "pointer_width_bytes": 8,
+      "payload_length": 266,
+      "payload_sha256": "4bd85fe85fe2477d547ca2e2fc1e795ddd2aef69bcec53272c6e71bbc1583fc3",
+      "field_offset_bytes": 24,
+      "field_bytes_hex": "82fc1699",
+      "raw_little_endian_uint32": 2568420482,
+      "same_bits_as_int32": -1726546814,
+      "independent_dissect_uint32": 2568420482,
+      "application_decoded_uint32": 2568420482,
+      "identity_and_payload_match": true,
+      "all_checks_match": true
+    }
+  ]
+}

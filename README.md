@@ -19,8 +19,8 @@ native `OpenTrace`, `ProcessTrace`, and TDH reader and uses .NET 10.
 complete collection, complete decoding or forensic accuracy.** TCP/IP, Thread,
 WPP and other unlisted kernel layouts are not covered by these built-in parsers.
 File-name snapshots do not establish file access, and raw timestamps are not UTC.
-Controlled Windows smoke tests and selected independent field comparisons have
-passed; broader native corpus validation remains incomplete. See the measured results
+Controlled Windows smoke tests and public ETL native comparisons have passed
+for the checked fields; decoding coverage remains limited. See the measured results
 and remaining gaps in [Investigation validation](docs/investigation-validation.md)
 and the [validation procedure](docs/validation.md).
 
@@ -308,7 +308,7 @@ Windows compatibility, malformed/truncated ETLs, and broad provider coverage
 require further testing. Compare representative events, counts, identities, and
 values with an independent decoder before relying on a new provider or build.
 See [Investigation validation](docs/investigation-validation.md) for measured
-results, corpus failures and usefulness limits, and the
+results and usefulness limits, and the
 [validation procedure](docs/validation.md) for acceptance criteria.
 
 Run the portable tests after building:

@@ -143,6 +143,14 @@ arrays and layouts that the schema helper cannot verify retain the ordinary
 comparison rules. Regression tests cover signed/unsigned boundaries and the
 misleadingly named sample field in both output formats.
 
+The static Image v2 reference similarly returns `TimeDateStamp` as Int32,
+although the published MOF declares UInt32. Four affected fields were checked
+against the original four bytes, the independent MOF oracle and the official
+definition. The validator's additional rule requires the exact classic provider,
+ID 0, version 2, supported opcode and field. Other static fields retain ordinary
+comparison. The [additional raw-byte report](validation-results/portable/image-timestamp-reference-comparison.json)
+records the pinned source and each affected record.
+
 TraceEvent also normally translates kernel file names into drive-letter paths.
 The validator sets its public kernel path mapper to the identity function so
 the comparison checks the stored NT paths, as the Dissect comparison does.
@@ -164,18 +172,38 @@ and rundown events must be accounted for when linking a real case.
 
 ## Windows execution and remaining limits
 
-The Windows run for commit `e2425a5` passed the unit suite and the repository's
-generated EventSource/EventWrite/TraceLogging smoke test. The subsequent
-[diagnostic run](https://github.com/sumeshi/ETW2JSON/actions/runs/39565658668)
-confirmed native raw equality for the 7-record scalar trace and 23-record
-self-describing trace. It also exposed the scalar type errors described above
-and reported zero compared fields for the self-describing trace; those results
-were failures/incomplete coverage, not a successful semantic validation.
+The [Windows x64 run for commit `06eaa76`](https://github.com/sumeshi/ETW2JSON/actions/runs/39570311868)
+passed locked restore, Release build, the 249-test unit suite, 102 validator
+self-checks, 27 corpus-contract checks, generated EventSource/EventWrite/
+TraceLogging smoke checks and the external corpus step. Earlier failed comparisons
+led to the Boolean fix and the reference-representation corrections above.
 
-The current changes require another Windows comparison run. A self-describing
-record retained as `unsupported` is useful evidence preservation, but does not
-establish that its properties can be used in a finding. Passing raw checks or
-some field comparisons must not conceal those coverage gaps.
+| Native case | Records checked against CLI | TraceEvent fields compared | Field mismatches | Result scope |
+| --- | ---: | ---: | ---: | --- |
+| Primitive types | 7 | 55 | 0 | Supported comparable scalar values; five unsigned reference reinterpretations, five unspecified-zone DateTimes unverified. |
+| GC, supplied manifest | 71 | 49 | 0 | Comparable properties in 22 decoded records. |
+| GC, no metadata | 71 | 0 | 0 | Negative test: all 71 remain explicitly metadata-missing. |
+| Self-describing regression | 23 | 0 | 0 | Negative test: exactly 22 metadata-missing and one unsupported nested-struct record. |
+| Kernel/CLR, supplied manifest | **176,217** | **50,967** | **0** | Comparable properties in 17,212 records; four documented UInt32 reference reinterpretations. |
+
+Every case had zero native-to-CLI checked header, PID/TID, raw timestamp, payload,
+source and record-count mismatches. The wrapper also requires unchanged input
+hashes and minimum semantic coverage for positive cases. The negative cases
+require exact pinned input/provider/status/source/reason counts and retain
+`semantic_validation_completed=false`; they do not establish usable decoded
+properties. A self-describing record kept as `unsupported` remains undecoded.
+
+The large trace still has 3,514 unmatched native/reference mappings and 6,028
+static reference fields absent under the same property name. They are unverified,
+not silently counted as matches. The application status table above also applies
+to this native run: most records remain undecoded. The matcher accounts for
+TraceEvent's PID/TID fixups while the separate raw pass checks every CLI record.
+The native raw pass does not compare activity IDs or extended-data items.
+
+The actual public check summaries, complete counters and sampled diagnostics are
+saved in [Windows results](validation-results/windows/README.md). Full outputs,
+hashes and reports are attached to the linked CI run with 14-day artifact
+retention. The saved summaries are not copies of the complete artifacts.
 
 These results support scoped extraction of the checked process/module/name
 layouts and metadata recovery work. They do not establish a general Windows
