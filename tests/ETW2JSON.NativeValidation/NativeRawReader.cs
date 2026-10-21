@@ -34,14 +34,28 @@ internal static class NativeRawReader
                     Marshal.Copy(record.UserData, bytes, 0, bytes.Length);
                 }
                 bool traceLogging = false;
+                int schemaItems = 0;
+                Dictionary<string, TraceLoggingScalarDeclaration>? scalarTypes = null;
                 for (int i = 0; record.ExtendedData != IntPtr.Zero && i < record.ExtendedDataCount; i++)
                 {
                     // EVENT_HEADER_EXTENDED_DATA_ITEM is 16 bytes; ExtType is at
                     // offset 2. This is a mapping hint, not extended-data validation.
                     if (unchecked((ushort)Marshal.ReadInt16(record.ExtendedData, i * 16 + 2)) == 0x000b)
+                    {
                         traceLogging = true;
+                        schemaItems++;
+                        int size = unchecked((ushort)Marshal.ReadInt16(record.ExtendedData, i * 16 + 6));
+                        IntPtr data = Marshal.ReadIntPtr(record.ExtendedData, i * 16 + 8);
+                        if (schemaItems == 1 && size != 0 && data != IntPtr.Zero)
+                        {
+                            var schema = new byte[size];
+                            Marshal.Copy(data, schema, 0, size);
+                            if (TraceLoggingScalarSchema.TryRead(schema, out var declarations)) scalarTypes = declarations;
+                        }
+                        else scalarTypes = null;
+                    }
                 }
-                observe(new RawRecord(record.Header, bytes, traceLogging));
+                observe(new RawRecord(record.Header, bytes, traceLogging, scalarTypes));
             }
             catch (Exception error)
             {
@@ -173,7 +187,8 @@ internal static class NativeRawReader
     }
 }
 
-internal sealed record RawRecord(NativeRawReader.EventHeader Header, byte[] Payload, bool TraceLogging);
+internal sealed record RawRecord(NativeRawReader.EventHeader Header, byte[] Payload, bool TraceLogging,
+    Dictionary<string, TraceLoggingScalarDeclaration>? ScalarTypes = null);
 internal sealed record NativeSession(long PerformanceFrequency, uint RawClockType, uint EventsLost, uint BuffersLost)
 {
     public uint CloseTraceStatus { get; set; }

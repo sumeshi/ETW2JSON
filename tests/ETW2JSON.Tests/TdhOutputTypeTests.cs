@@ -33,7 +33,7 @@ namespace ETW2JSON.Tests
         [InlineData(true, -204L)]
         [InlineData(true, long.MinValue)]
         [InlineData(true, long.MaxValue)]
-        public void TraceLoggingUnsignedWireWithSignedLongOutputRetainsSign(bool legacy, long value)
+        public void UnsignedWireWithExplicitSignedLongOutputRetainsSign(bool legacy, long value)
         {
             var property = new PropertyMetadata(TDH_IN_TYPE.TDH_INTYPE_UINT64, TDH_OUT_TYPE.TDH_OUTTYPE_LONG,
                 "int64_type", false, false, 0, null);

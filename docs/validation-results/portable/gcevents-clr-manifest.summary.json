@@ -1,0 +1,99 @@
+{
+  "validation_scope": "Linux replay of exported records through managed decoding; not native OpenTrace/TDH/ProcessTrace validation. Header flags were inferred from ETL markers by the exporter.",
+  "limitations": [
+    "TraceLogging records are explicitly skipped; no native TDH lookup is mocked.",
+    "Raw round-trip equality does not establish decoded property correctness.",
+    "Buffer/file order may differ from native ProcessTrace ordering."
+  ],
+  "input_exports_sha256": {
+    "${CORPUS_DIR}/exports/PerfViewData.all.jsonl": "90a268efada2a58ee5dba657ca545960978e2cec37c56cc0e29544ce2e7ca1de"
+  },
+  "manifest_files_sha256": {
+    "${CORPUS_DIR}/samples/ClrEtwAll.man": "54a1895602e0a7d8c352ba5734c677bf7873c902c2463ffe89d1e8e6c4e45524"
+  },
+  "decoder_assembly_sha256": "58fc529840accd96369059c6dd504ee951877175c0e99d70a0126d0f871c8c3a",
+  "helper_assembly_sha256": "b418f7e550b2d60e77032ec1ca296a1344e3533c772c2c7db2fd2c92449132ee",
+  "runtime_version": "10.0.12",
+  "runtime_os": "Debian GNU/Linux 13 (trixie)",
+  "input_records": 71,
+  "replayed_records": 71,
+  "skipped_tracelogging_records": 0,
+  "emitted_records": 71,
+  "status_counts": {
+    "decoded": 22,
+    "metadata_missing": 35,
+    "unsupported": 14
+  },
+  "metadata_source_counts": {
+    "external_manifest": 36,
+    "unknown": 35
+  },
+  "by_source_provider_opcode": {
+    "PerfViewData.etl:68fdd900-4a3e-11d1-84f4-0000f80464e3:0": {
+      "metadata_missing": 1
+    },
+    "PerfViewData.etl:68fdd900-4a3e-11d1-84f4-0000f80464e3:80": {
+      "metadata_missing": 1
+    },
+    "PerfViewData.etl:e13c0d23-ccbc-4e12-931b-d9cc2eee27e4:1": {
+      "unsupported": 3
+    },
+    "PerfViewData.etl:e13c0d23-ccbc-4e12-931b-d9cc2eee27e4:10": {
+      "unsupported": 2
+    },
+    "PerfViewData.etl:e13c0d23-ccbc-4e12-931b-d9cc2eee27e4:11": {
+      "metadata_missing": 12
+    },
+    "PerfViewData.etl:e13c0d23-ccbc-4e12-931b-d9cc2eee27e4:132": {
+      "decoded": 2
+    },
+    "PerfViewData.etl:e13c0d23-ccbc-4e12-931b-d9cc2eee27e4:133": {
+      "metadata_missing": 2
+    },
+    "PerfViewData.etl:e13c0d23-ccbc-4e12-931b-d9cc2eee27e4:134": {
+      "unsupported": 7
+    },
+    "PerfViewData.etl:e13c0d23-ccbc-4e12-931b-d9cc2eee27e4:136": {
+      "decoded": 2
+    },
+    "PerfViewData.etl:e13c0d23-ccbc-4e12-931b-d9cc2eee27e4:137": {
+      "decoded": 2
+    },
+    "PerfViewData.etl:e13c0d23-ccbc-4e12-931b-d9cc2eee27e4:15": {
+      "decoded": 3
+    },
+    "PerfViewData.etl:e13c0d23-ccbc-4e12-931b-d9cc2eee27e4:19": {
+      "decoded": 3
+    },
+    "PerfViewData.etl:e13c0d23-ccbc-4e12-931b-d9cc2eee27e4:2": {
+      "decoded": 2
+    },
+    "PerfViewData.etl:e13c0d23-ccbc-4e12-931b-d9cc2eee27e4:202": {
+      "metadata_missing": 13
+    },
+    "PerfViewData.etl:e13c0d23-ccbc-4e12-931b-d9cc2eee27e4:204": {
+      "metadata_missing": 2
+    },
+    "PerfViewData.etl:e13c0d23-ccbc-4e12-931b-d9cc2eee27e4:205": {
+      "metadata_missing": 2
+    },
+    "PerfViewData.etl:e13c0d23-ccbc-4e12-931b-d9cc2eee27e4:208": {
+      "metadata_missing": 1
+    },
+    "PerfViewData.etl:e13c0d23-ccbc-4e12-931b-d9cc2eee27e4:209": {
+      "metadata_missing": 1
+    },
+    "PerfViewData.etl:e13c0d23-ccbc-4e12-931b-d9cc2eee27e4:32": {
+      "decoded": 6
+    },
+    "PerfViewData.etl:e13c0d23-ccbc-4e12-931b-d9cc2eee27e4:35": {
+      "unsupported": 2
+    },
+    "PerfViewData.etl:e13c0d23-ccbc-4e12-931b-d9cc2eee27e4:36": {
+      "decoded": 2
+    }
+  },
+  "roundtrip_mismatch_counts": {},
+  "roundtrip_mismatch_examples": [],
+  "output_sha256": "4a9b53e73b65397643aeaa867671eb5a5da7711b517265b8f932b4dd6b165829"
+}

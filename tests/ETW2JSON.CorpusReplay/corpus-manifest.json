@@ -13,7 +13,8 @@
     "Disk ETL order is buffer order, not the timestamp order delivered by native ProcessTrace.",
     "Reference timestamp strings are dissect calculations and not independently verified UTC anchors.",
     "Large source archive net.4.5.x64.etl.zip contains net.4.5.x86.etl, while session pointer size is 8 and some event headers are 32-bit.",
-    "PerfView baseline text may truncate long values and is corroboration rather than a complete machine-readable oracle."
+    "PerfView baseline text may truncate long values and is corroboration rather than a complete machine-readable oracle.",
+    "primitive-types.etl TraceLogging metadata declares both int64_type and uint64_type as UInt64 (raw type byte 10 at extension-data offsets 123 and 136). PerfView's baseline renders the former as negative Int64; do not infer signedness from that field name or baseline text. TraceEvent 4.0.0 DynamicTraceEventData.PayloadFetch collapses TDH UInt64 to System.Int64."
   ],
   "files": [
     {

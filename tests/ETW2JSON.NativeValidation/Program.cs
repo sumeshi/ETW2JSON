@@ -211,7 +211,7 @@ internal static class Program
             if (!matched) report.Raw.MismatchedRecords++;
             index.WriteLine(JsonSerializer.Serialize(new RawIndex(ordinal, raw.Header.ProviderId, raw.Header.Flags,
                 raw.Header.Id, raw.Header.Version, raw.Header.Opcode, raw.TraceLogging,
-                raw.Header.ProcessId, raw.Header.ThreadId, raw.Header.Timestamp, raw.Payload.Length, hash, matched), JsonOptions));
+                raw.Header.ProcessId, raw.Header.ThreadId, raw.Header.Timestamp, raw.Payload.Length, hash, matched, raw.ScalarTypes), JsonOptions));
         });
         while (application.ReadLine() is not null)
         {
@@ -225,6 +225,9 @@ internal static class Program
     private static void CompareTraceEvent(string etl, string directory, ComparisonReport report)
     {
         using var source = new ETWTraceEventSource(etl, TraceEventSourceType.FileOnly);
+        // Compare the stored NT path. The reference parser otherwise translates
+        // kernel paths through its drive mappings before exposing FileName.
+        source.Kernel.KernelPathToUserPathMapper = path => path;
         List<ReferenceField>? dynamicFields = null;
         bool comparisonPass = false;
         Exception? callbackError = null;
@@ -334,6 +337,19 @@ internal static class Program
                         continue;
                     }
                     object? expected = field.Value;
+                    if (dynamicPayload && native.TraceLoggingScalarTypes != null
+                        && native.TraceLoggingScalarTypes.TryGetValue(name, out var declaration))
+                    {
+                        object? normalized = TraceLoggingScalarSchema.NormalizeUnsignedReference(declaration, expected);
+                        if (!Equals(expected, normalized))
+                        {
+                            report.Semantic.ReferenceUnsignedReinterpretations++;
+                            report.Diagnose("reference_representation", ordinal, name,
+                                "TraceEvent signed value=" + Convert.ToString(expected, CultureInfo.InvariantCulture),
+                                "metadata declares unsigned scalar; value=" + Convert.ToString(normalized, CultureInfo.InvariantCulture));
+                        }
+                        expected = normalized;
+                    }
                     ValueComparison value = PayloadValueComparer.Compare(expected, actual);
                     if (value.Result == ValueResult.Unsupported)
                     {
@@ -413,10 +429,12 @@ internal sealed record ReferenceField(string Name, object? Value, string? Error)
 
 internal sealed record RawIndex(long Ordinal, Guid ProviderGuid, ushort Flags, ushort EventId, byte Version, byte Opcode,
     bool TraceLogging, uint ProcessId, uint ThreadId,
-    long RawTimestamp, int PayloadLength, string PayloadSha256, bool ApplicationMatched);
+    long RawTimestamp, int PayloadLength, string PayloadSha256, bool ApplicationMatched,
+    Dictionary<string, TraceLoggingScalarDeclaration>? TraceLoggingScalarTypes = null);
 
 internal sealed class ComparisonReport
 {
+    private readonly Dictionary<string, int> diagnosticCounts = new();
     public string Outcome { get; set; } = "not_completed";
     public int ExitCode { get; set; }
     public int? CliExitCode { get; set; }
@@ -443,8 +461,10 @@ internal sealed class ComparisonReport
         "Semantic comparison covers mapped records and supported values only; skipped fields/providers and reference-decodable application gaps are reported separately.",
         "Semantic matching uses at most 128 native/application record pairs (8 Mi characters plus one pending record), with timestamp-guided forward resynchronization. Ambiguous, outside-window or fixed-up payloads remain unmatched; reference callback counts are coverage, not a native/application raw mismatch.",
         "TraceEvent Dynamic can consult the analysis host's registered TDH metadata; agreement does not authenticate a schema against the evidence installation.",
+        "The reference kernel path mapper is the identity function so FileName comparisons use stored NT paths rather than translated drive paths.",
+        "TraceEvent signed representations are reinterpreted as unsigned only for independently parsed flat TraceLogging UInt16/UInt32/UInt64 declarations with default output format. Reinterpretations are counted separately; field names do not select a type.",
         "Scalar and recursively supported array/structure values are compared. Static-parser property aliases are not guessed.",
-        "Only the first 100 diagnostics are retained. Counters cover the complete run.",
+        "At most 20 diagnostics per phase and 100 overall are retained. Counters cover the complete run.",
     ];
 
     public ProviderSummary Provider(Guid guid)
@@ -468,7 +488,12 @@ internal sealed class ComparisonReport
 
     public void Diagnose(string phase, long ordinal, string field, string reference, string actual)
     {
-        if (Diagnostics.Count < 100) Diagnostics.Add(new Diagnostic(phase, ordinal, field, Clip(reference), Clip(actual)));
+        int phaseCount = diagnosticCounts.GetValueOrDefault(phase);
+        if (phaseCount < 20 && Diagnostics.Count < 100)
+        {
+            Diagnostics.Add(new Diagnostic(phase, ordinal, field, Clip(reference), Clip(actual)));
+            diagnosticCounts[phase] = phaseCount + 1;
+        }
         static string Clip(string text) => text.Length <= 300 ? text : text[..300] + "…";
     }
 }
@@ -496,6 +521,7 @@ internal sealed class SemanticComparison
     public long ComparedRecords { get; set; }
     public long ComparedFields { get; set; }
     public long MismatchingFields { get; set; }
+    public long ReferenceUnsignedReinterpretations { get; set; }
     public int ReferenceReportedEventsLost { get; set; }
     public Dictionary<string, long> SkippedRecords { get; } = new();
     public Dictionary<string, long> SkippedFields { get; } = new();

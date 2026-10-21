@@ -67,9 +67,13 @@ The second review found and addressed the following problems:
 - SID/session/schema/unknown extended-data bytes were discarded. They are now
   snapshotted with bounds and diagnostics, separately from payload bytes.
 - Windows scalar comparison found boolean `False`/`True` represented as numeric
-  `0`/`1`, and signed Int64 values represented as huge unsigned values. Generated
-  decoding now respects these TDH output types without changing wire lengths or
-  array-count references.
+  `0`/`1`. Generated decoding now respects the TDH Boolean output type without
+  changing wire lengths or array-count references.
+- A supplied CLR manifest contains an explicitly empty template for a record
+  carrying 425 payload bytes. This previously caused a null-reference exception.
+  It now produces a specific unconsumed-payload error, with the supplied schema's
+  SHA-256 provenance and original bytes intact. An empty payload with that
+  template remains a legitimate zero-field event.
 
 ## Verified managed decoding coverage
 
@@ -100,6 +104,48 @@ With the supplied official CLR manifest, the 71-record GC trace yielded 22
 records, 11 could be uniquely associated with untruncated upstream text baseline
 records; their 26 common literal field values matched. The other 11 remain
 unverified against that text baseline because of ambiguous matches or rounding.
+
+The full 176,217-record replay, both with and without the CLR manifest, had zero
+checked raw/header/extended-data mismatches and emitted every replayed record.
+Its status counts make the remaining interpretation gaps visible:
+
+| Metadata supplied | decoded | metadata_missing | unsupported | partial | decode_error |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| None | 24,372 | 151,827 | 5 | 13 | 0 |
+| Official CLR manifest | 27,115 | 125,044 | 23,774 | 13 | 271 |
+
+All 271 errors are the incomplete CLR template described above, now reported
+with 425 unconsumed bytes and `external_manifest` provenance. They remain errors.
+Both full outputs also pass the complete 70,318-value kernel comparison.
+An additional independent binary check of 374 stack extensions matched their
+match IDs and all **19,660 addresses**. This does not validate symbol resolution
+or attribution of a sampled stack to an investigation activity.
+
+Small machine-generated reports, hashes and run details are retained in
+[portable validation results](validation-results/portable/README.md).
+
+## Reference differences identified during Windows comparison
+
+The scalar sample calls a field `int64_type`, but its actual TraceLogging
+metadata declares type 10 (UInt64), with no signed output format. Both its
+`int64_type` and `uint64_type` have this declaration. TraceEvent 4.0.0's dynamic
+TDH parser folds UInt64 into `System.Int64`, so high-bit values appear negative
+in that reference and its text baseline. This is a reference representation
+difference, not grounds to infer a signed type from the field name.
+The relevant [TraceEvent 4.0.0 source](https://github.com/microsoft/perfview/blob/10e5d271cebcdf5d6cf122c6ab9c863860a7a2f1/src/TraceEvent/DynamicTraceEventParser.cs#L1630)
+and the actual NuGet assembly were checked against the sample metadata.
+
+The native validator independently parses supported flat TraceLogging scalar
+declarations from extension bytes. It reinterprets a negative reference value
+as unsigned only when its declared type, width and default output format require
+that interpretation. It counts these cases separately. Signed declarations,
+arrays and layouts that the schema helper cannot verify retain the ordinary
+comparison rules. Regression tests cover signed/unsigned boundaries and the
+misleadingly named sample field in both output formats.
+
+TraceEvent also normally translates kernel file names into drive-letter paths.
+The validator sets its public kernel path mapper to the identity function so
+the comparison checks the stored NT paths, as the Dissect comparison does.
 
 ## An investigation question checked with the sample
 

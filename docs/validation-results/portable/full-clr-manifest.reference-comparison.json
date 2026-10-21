@@ -1,0 +1,30 @@
+{
+  "scope": "Property-value comparison against dissect.etl 3.14 in an independent process for explicitly selected classic layouts; not native ETL reading validation.",
+  "counts": {
+    "selected_records": 15179,
+    "decoded_records": 15179,
+    "compared_field_values": 70318,
+    "reference_records_not_found_in_input": 0,
+    "not_decoded_records": 0,
+    "missing_fields": 0,
+    "mismatched_field_values": 0
+  },
+  "by_family": {
+    "Process": {
+      "selected_records": 76,
+      "decoded_records": 76,
+      "compared_field_values": 912
+    },
+    "Image": {
+      "selected_records": 3920,
+      "decoded_records": 3920,
+      "compared_field_values": 47040
+    },
+    "FileIo": {
+      "selected_records": 11183,
+      "decoded_records": 11183,
+      "compared_field_values": 22366
+    }
+  },
+  "problems": []
+}

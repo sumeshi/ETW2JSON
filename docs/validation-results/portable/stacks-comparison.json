@@ -1,0 +1,8 @@
+{
+  "scope": "Independent little-endian decoding of exported real ETL stack bytes versus emitted fields; not native ETL reading or symbolization.",
+  "checked_stack_records": 374,
+  "checked_stack_frames": 19660,
+  "mismatched_records": 0,
+  "invalid_or_ambiguous_reference_records": 0,
+  "mismatch_record_examples": []
+}

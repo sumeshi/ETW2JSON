@@ -1,0 +1,18 @@
+{
+  "scope": "Public PerfView manifest empty-template records must retain external manifest provenance and fail explicitly on all undescribed payload bytes. This does not establish a complete schema for these events.",
+  "emitted_records_checked": 176217,
+  "decode_error_records_checked": 271,
+  "expected_provider_guid": "763fd754-7086-4dfe-95eb-c01a46faf4ca",
+  "expected_event_id": 4,
+  "expected_version": 2,
+  "required_metadata_source": "external_manifest",
+  "required_manifest_sha256": "54a1895602e0a7d8c352ba5734c677bf7873c902c2463ffe89d1e8e6c4e45524",
+  "payload_bytes_equal_reported_unconsumed_bytes": {
+    "425": 271
+  },
+  "mismatched_records": 0,
+  "failure_examples": [],
+  "decode_notes": {
+    "InvalidOperationException: Event payload has 425 unconsumed bytes; the schema does not describe the complete payload.": 271
+  }
+}

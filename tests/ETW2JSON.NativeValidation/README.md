@@ -76,7 +76,7 @@ does not establish that those registrations match the acquired Windows system.
 
 Results are written to `comparison.json`, with per-provider decoding coverage,
 comparison/skip counters, source hashes, available event-loss indicators and the
-first 100 diagnostics. `native-index.jsonl` stores a streaming raw-record index;
+up to 20 diagnostics per phase and 100 overall. `native-index.jsonl` stores a streaming raw-record index;
 reference callback counts and unmatched native/reference records are semantic
 coverage indicators. They do not change the separate full native-to-CLI raw
 comparison outcome. The implementation retains the bounded matching window,
@@ -91,6 +91,28 @@ so repeated missing-schema records do not hide a later unsupported reason. These
 are coverage diagnostics, not raw or semantic mismatches. Reason dictionaries
 retain up to 32 global or 16 per-provider reason variants; additional variants
 are counted in an overflow bucket, and the original notes remain in the JSONL.
+
+The reference kernel path mapper is explicitly set to the identity function so
+file-name comparisons use the stored NT path. TraceEvent otherwise translates
+those names through drive mappings. TraceEvent 4.0.0 also folds unsigned dynamic
+integers into signed CLR types. A separate bounded reader checks flat
+TraceLogging scalar declarations directly in extension type 11. Only a declared
+UInt16/UInt32/UInt64 with default output format permits a negative reference
+short/int/long to be reinterpreted at that width. These cases appear in
+`reference_unsigned_reinterpretations`. Names do not select a type; signed
+declarations, nondefault formats, arrays and unverified layouts use ordinary
+comparison. This reader does not validate the complete extended-data output.
+
+The corpus wrapper has separate negative cases for absent metadata and a
+self-describing struct. It requires the pinned input hash, complete native raw
+equality and exact provider/status/source/reason counts. Accepted negative cases
+keep exit `4` and `semantic_validation_completed=false`; they demonstrate the
+specified fallback and do not pass semantic validation.
+
+Run `pwsh -NoProfile -File tests/fixtures/Verify-CorpusContracts.ps1` from the
+repository root to exercise the wrapper's acceptance rules without Windows ETW
+or network access. The checks include rejection of changed hashes, extra records,
+unexpected fallback reasons and semantic mismatches.
 
 | Exit code | Meaning |
 | --- | --- |

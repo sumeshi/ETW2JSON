@@ -162,8 +162,8 @@
             private Expression WriteValue(PropertyMetadata metadata, Expression value)
             {
                 // TDH describes wire width with InType and intended presentation
-                // with OutType. TraceLogging uses byte booleans and can encode a
-                // signed Int64 as UInt64 + LONG. Keep reference/count variables in
+                // with OutType. This includes byte booleans and an explicitly
+                // signed LONG output for UInt64 input. Keep reference/count variables in
                 // their wire type while formatting the emitted value correctly.
                 if (metadata.OutType == TDH_OUT_TYPE.TDH_OUTTYPE_BOOLEAN && IsInteger(value.Type))
                 {

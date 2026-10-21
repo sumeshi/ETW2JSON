@@ -1,7 +1,7 @@
 {
   "repository": "https://github.com/microsoft/perfview",
   "commit": "29b21620a6c295979e83dc99008262ad2f3c6a2d",
-  "source_manifest": "src/TraceEvent/TraceEvent.Tests/inputs/ClrEtwAll.man",
+  "source_manifest": "src/TraceEvent/Parsers/ClrEtwAll.man",
   "source_manifest_sha256": "54a1895602e0a7d8c352ba5734c677bf7873c902c2463ffe89d1e8e6c4e45524",
   "extraction": "Only the matching provider identity, event 4/version 2 and empty GCPerHeapHistory template are retained; message and keyword references are omitted.",
   "license": "MIT; .NET Foundation and Contributors; see kernel-investigation-reference.LICENSE.txt"

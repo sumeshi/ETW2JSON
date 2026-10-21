@@ -29,6 +29,14 @@ parser is also useful as an independent reference for supported classic events.
 Its existence does not make it an infallible oracle: record matching, formatting
 and coverage differences must be examined.
 
+One concrete reference limitation is `primitive-types.etl`: its field named
+`int64_type` has raw TraceLogging type byte `0x0A` (UInt64), as does
+`uint64_type`. The PerfView text baseline prints the former as a negative Int64.
+TraceEvent 4.0.0's dynamic TDH `PayloadFetch` maps UInt64 to `System.Int64`,
+which explains that representation difference. Neither the field name nor that
+baseline text can establish signedness. The raw declarations and payload bytes
+must be considered when comparing values.
+
 The on-disk ETL header is not a native callback record. The exporter retains raw
 record/header bytes and marks the inferred `replay_flags`, deriving 32/64-bit and
 classic bits from on-disk header markers. Disk buffer order also differs from

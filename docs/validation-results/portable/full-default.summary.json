@@ -1,0 +1,423 @@
+{
+  "validation_scope": "Linux replay of exported records through managed decoding; not native OpenTrace/TDH/ProcessTrace validation. Header flags were inferred from ETL markers by the exporter.",
+  "limitations": [
+    "TraceLogging records are explicitly skipped; no native TDH lookup is mocked.",
+    "Raw round-trip equality does not establish decoded property correctness.",
+    "Buffer/file order may differ from native ProcessTrace ordering."
+  ],
+  "input_exports_sha256": {
+    "${CORPUS_DIR}/exports-full/net.4.5.x86.all.jsonl": "ffc021ca8ae6f6a0a4e4fb8eddb7eb380d4993ff059d3a470309c324ffad580c"
+  },
+  "manifest_files_sha256": {},
+  "decoder_assembly_sha256": "58fc529840accd96369059c6dd504ee951877175c0e99d70a0126d0f871c8c3a",
+  "helper_assembly_sha256": "b418f7e550b2d60e77032ec1ca296a1344e3533c772c2c7db2fd2c92449132ee",
+  "runtime_version": "10.0.12",
+  "runtime_os": "Debian GNU/Linux 13 (trixie)",
+  "input_records": 176217,
+  "replayed_records": 176217,
+  "skipped_tracelogging_records": 0,
+  "emitted_records": 176217,
+  "status_counts": {
+    "decoded": 24372,
+    "metadata_missing": 151827,
+    "partial": 13,
+    "unsupported": 5
+  },
+  "metadata_source_counts": {
+    "builtin_parser": 23973,
+    "embedded": 417,
+    "unknown": 151827
+  },
+  "by_source_provider_opcode": {
+    "net.4.5.x86.etl:01853a65-418f-4f36-aefc-dc0f1d2fd235:10": {
+      "metadata_missing": 1
+    },
+    "net.4.5.x86.etl:01853a65-418f-4f36-aefc-dc0f1d2fd235:11": {
+      "metadata_missing": 1
+    },
+    "net.4.5.x86.etl:01853a65-418f-4f36-aefc-dc0f1d2fd235:12": {
+      "metadata_missing": 1
+    },
+    "net.4.5.x86.etl:01853a65-418f-4f36-aefc-dc0f1d2fd235:13": {
+      "metadata_missing": 3
+    },
+    "net.4.5.x86.etl:01853a65-418f-4f36-aefc-dc0f1d2fd235:15": {
+      "metadata_missing": 157
+    },
+    "net.4.5.x86.etl:01853a65-418f-4f36-aefc-dc0f1d2fd235:16": {
+      "metadata_missing": 1
+    },
+    "net.4.5.x86.etl:01853a65-418f-4f36-aefc-dc0f1d2fd235:17": {
+      "metadata_missing": 1
+    },
+    "net.4.5.x86.etl:01853a65-418f-4f36-aefc-dc0f1d2fd235:18": {
+      "metadata_missing": 1
+    },
+    "net.4.5.x86.etl:01853a65-418f-4f36-aefc-dc0f1d2fd235:22": {
+      "metadata_missing": 78
+    },
+    "net.4.5.x86.etl:01853a65-418f-4f36-aefc-dc0f1d2fd235:23": {
+      "metadata_missing": 2
+    },
+    "net.4.5.x86.etl:01853a65-418f-4f36-aefc-dc0f1d2fd235:25": {
+      "metadata_missing": 1
+    },
+    "net.4.5.x86.etl:01853a65-418f-4f36-aefc-dc0f1d2fd235:28": {
+      "metadata_missing": 1
+    },
+    "net.4.5.x86.etl:1c95126e-7eea-49a9-a3fe-a378b03ddb4d:0": {
+      "unsupported": 4
+    },
+    "net.4.5.x86.etl:22fb2cd6-0e7b-422b-a0c7-2fad1fd0e716:1": {
+      "unsupported": 1
+    },
+    "net.4.5.x86.etl:22fb2cd6-0e7b-422b-a0c7-2fad1fd0e716:2": {
+      "decoded": 1
+    },
+    "net.4.5.x86.etl:2cb15d1d-5fc1-11d2-abe1-00a0c911f518:10": {
+      "decoded": 39
+    },
+    "net.4.5.x86.etl:2cb15d1d-5fc1-11d2-abe1-00a0c911f518:2": {
+      "decoded": 32
+    },
+    "net.4.5.x86.etl:2cb15d1d-5fc1-11d2-abe1-00a0c911f518:3": {
+      "decoded": 1921
+    },
+    "net.4.5.x86.etl:2cb15d1d-5fc1-11d2-abe1-00a0c911f518:33": {
+      "metadata_missing": 1
+    },
+    "net.4.5.x86.etl:2cb15d1d-5fc1-11d2-abe1-00a0c911f518:34": {
+      "metadata_missing": 1
+    },
+    "net.4.5.x86.etl:2cb15d1d-5fc1-11d2-abe1-00a0c911f518:4": {
+      "decoded": 1928
+    },
+    "net.4.5.x86.etl:2e5dba47-a3d2-4d16-8ee0-6671ffdcd7b5:0": {
+      "decoded": 3
+    },
+    "net.4.5.x86.etl:2e5dba47-a3d2-4d16-8ee0-6671ffdcd7b5:1": {
+      "decoded": 3
+    },
+    "net.4.5.x86.etl:2e5dba47-a3d2-4d16-8ee0-6671ffdcd7b5:2": {
+      "decoded": 1
+    },
+    "net.4.5.x86.etl:2e5dba47-a3d2-4d16-8ee0-6671ffdcd7b5:254": {
+      "partial": 1
+    },
+    "net.4.5.x86.etl:315a8872-923e-4ea2-9889-33cd4754bf64:1": {
+      "decoded": 14
+    },
+    "net.4.5.x86.etl:315a8872-923e-4ea2-9889-33cd4754bf64:2": {
+      "decoded": 14
+    },
+    "net.4.5.x86.etl:3d6fa8d0-fe05-11d0-9dda-00c04fd7ba7c:1": {
+      "decoded": 1
+    },
+    "net.4.5.x86.etl:3d6fa8d0-fe05-11d0-9dda-00c04fd7ba7c:2": {
+      "decoded": 1
+    },
+    "net.4.5.x86.etl:3d6fa8d0-fe05-11d0-9dda-00c04fd7ba7c:3": {
+      "decoded": 37
+    },
+    "net.4.5.x86.etl:3d6fa8d0-fe05-11d0-9dda-00c04fd7ba7c:32": {
+      "metadata_missing": 1
+    },
+    "net.4.5.x86.etl:3d6fa8d0-fe05-11d0-9dda-00c04fd7ba7c:33": {
+      "metadata_missing": 37
+    },
+    "net.4.5.x86.etl:3d6fa8d0-fe05-11d0-9dda-00c04fd7ba7c:39": {
+      "metadata_missing": 9
+    },
+    "net.4.5.x86.etl:3d6fa8d0-fe05-11d0-9dda-00c04fd7ba7c:4": {
+      "decoded": 37
+    },
+    "net.4.5.x86.etl:3d6fa8d1-fe05-11d0-9dda-00c04fd7ba7c:1": {
+      "metadata_missing": 34
+    },
+    "net.4.5.x86.etl:3d6fa8d1-fe05-11d0-9dda-00c04fd7ba7c:2": {
+      "metadata_missing": 8
+    },
+    "net.4.5.x86.etl:3d6fa8d1-fe05-11d0-9dda-00c04fd7ba7c:3": {
+      "metadata_missing": 581
+    },
+    "net.4.5.x86.etl:3d6fa8d1-fe05-11d0-9dda-00c04fd7ba7c:4": {
+      "metadata_missing": 607
+    },
+    "net.4.5.x86.etl:3d6fa8d3-fe05-11d0-9dda-00c04fd7ba7c:32": {
+      "metadata_missing": 116
+    },
+    "net.4.5.x86.etl:3d6fa8d4-fe05-11d0-9dda-00c04fd7ba7c:10": {
+      "metadata_missing": 120
+    },
+    "net.4.5.x86.etl:3d6fa8d4-fe05-11d0-9dda-00c04fd7ba7c:11": {
+      "metadata_missing": 19
+    },
+    "net.4.5.x86.etl:3d6fa8d4-fe05-11d0-9dda-00c04fd7ba7c:12": {
+      "metadata_missing": 120
+    },
+    "net.4.5.x86.etl:3d6fa8d4-fe05-11d0-9dda-00c04fd7ba7c:13": {
+      "metadata_missing": 20
+    },
+    "net.4.5.x86.etl:3d6fa8d4-fe05-11d0-9dda-00c04fd7ba7c:14": {
+      "metadata_missing": 4
+    },
+    "net.4.5.x86.etl:3d6fa8d4-fe05-11d0-9dda-00c04fd7ba7c:15": {
+      "metadata_missing": 4
+    },
+    "net.4.5.x86.etl:68fdd900-4a3e-11d1-84f4-0000f80464e3:0": {
+      "metadata_missing": 1
+    },
+    "net.4.5.x86.etl:68fdd900-4a3e-11d1-84f4-0000f80464e3:32": {
+      "metadata_missing": 2
+    },
+    "net.4.5.x86.etl:68fdd900-4a3e-11d1-84f4-0000f80464e3:5": {
+      "metadata_missing": 3
+    },
+    "net.4.5.x86.etl:68fdd900-4a3e-11d1-84f4-0000f80464e3:8": {
+      "metadata_missing": 2
+    },
+    "net.4.5.x86.etl:763fd754-7086-4dfe-95eb-c01a46faf4ca:14": {
+      "metadata_missing": 1
+    },
+    "net.4.5.x86.etl:763fd754-7086-4dfe-95eb-c01a46faf4ca:17": {
+      "metadata_missing": 271
+    },
+    "net.4.5.x86.etl:763fd754-7086-4dfe-95eb-c01a46faf4ca:18": {
+      "metadata_missing": 271
+    },
+    "net.4.5.x86.etl:763fd754-7086-4dfe-95eb-c01a46faf4ca:21": {
+      "metadata_missing": 271
+    },
+    "net.4.5.x86.etl:763fd754-7086-4dfe-95eb-c01a46faf4ca:22": {
+      "metadata_missing": 271
+    },
+    "net.4.5.x86.etl:763fd754-7086-4dfe-95eb-c01a46faf4ca:23": {
+      "metadata_missing": 271
+    },
+    "net.4.5.x86.etl:763fd754-7086-4dfe-95eb-c01a46faf4ca:24": {
+      "metadata_missing": 271
+    },
+    "net.4.5.x86.etl:763fd754-7086-4dfe-95eb-c01a46faf4ca:53": {
+      "metadata_missing": 1
+    },
+    "net.4.5.x86.etl:763fd754-7086-4dfe-95eb-c01a46faf4ca:54": {
+      "metadata_missing": 1
+    },
+    "net.4.5.x86.etl:763fd754-7086-4dfe-95eb-c01a46faf4ca:57": {
+      "metadata_missing": 1
+    },
+    "net.4.5.x86.etl:763fd754-7086-4dfe-95eb-c01a46faf4ca:58": {
+      "metadata_missing": 1
+    },
+    "net.4.5.x86.etl:763fd754-7086-4dfe-95eb-c01a46faf4ca:63": {
+      "metadata_missing": 2
+    },
+    "net.4.5.x86.etl:763fd754-7086-4dfe-95eb-c01a46faf4ca:64": {
+      "metadata_missing": 2
+    },
+    "net.4.5.x86.etl:763fd754-7086-4dfe-95eb-c01a46faf4ca:65": {
+      "metadata_missing": 2
+    },
+    "net.4.5.x86.etl:763fd754-7086-4dfe-95eb-c01a46faf4ca:66": {
+      "metadata_missing": 2
+    },
+    "net.4.5.x86.etl:763fd754-7086-4dfe-95eb-c01a46faf4ca:67": {
+      "metadata_missing": 2
+    },
+    "net.4.5.x86.etl:763fd754-7086-4dfe-95eb-c01a46faf4ca:68": {
+      "metadata_missing": 2
+    },
+    "net.4.5.x86.etl:8e9f5090-2d75-4d03-8a81-e5afbf85daf1:0": {
+      "decoded": 5
+    },
+    "net.4.5.x86.etl:8e9f5090-2d75-4d03-8a81-e5afbf85daf1:254": {
+      "partial": 1
+    },
+    "net.4.5.x86.etl:90cbdc39-4a3e-11d1-84f4-0000f80464e3:32": {
+      "decoded": 54
+    },
+    "net.4.5.x86.etl:90cbdc39-4a3e-11d1-84f4-0000f80464e3:35": {
+      "decoded": 17
+    },
+    "net.4.5.x86.etl:90cbdc39-4a3e-11d1-84f4-0000f80464e3:36": {
+      "decoded": 11112
+    },
+    "net.4.5.x86.etl:9a280ac0-c8e0-11d1-84e2-00c04fb998a2:26": {
+      "metadata_missing": 252
+    },
+    "net.4.5.x86.etl:9a280ac0-c8e0-11d1-84e2-00c04fb998a2:27": {
+      "metadata_missing": 260
+    },
+    "net.4.5.x86.etl:9b79ee91-b5fd-41c0-a243-4248e266e9d0:32": {
+      "metadata_missing": 1
+    },
+    "net.4.5.x86.etl:9b79ee91-b5fd-41c0-a243-4248e266e9d0:33": {
+      "metadata_missing": 1
+    },
+    "net.4.5.x86.etl:9b79ee91-b5fd-41c0-a243-4248e266e9d0:34": {
+      "metadata_missing": 1
+    },
+    "net.4.5.x86.etl:9b79ee91-b5fd-41c0-a243-4248e266e9d0:35": {
+      "metadata_missing": 9
+    },
+    "net.4.5.x86.etl:9b79ee91-b5fd-41c0-a243-4248e266e9d0:37": {
+      "metadata_missing": 1
+    },
+    "net.4.5.x86.etl:a669021c-c450-4609-a035-5af59af4df18:1": {
+      "metadata_missing": 2
+    },
+    "net.4.5.x86.etl:a669021c-c450-4609-a035-5af59af4df18:15": {
+      "metadata_missing": 2
+    },
+    "net.4.5.x86.etl:a669021c-c450-4609-a035-5af59af4df18:17": {
+      "metadata_missing": 2
+    },
+    "net.4.5.x86.etl:a669021c-c450-4609-a035-5af59af4df18:36": {
+      "metadata_missing": 16
+    },
+    "net.4.5.x86.etl:a669021c-c450-4609-a035-5af59af4df18:40": {
+      "metadata_missing": 383
+    },
+    "net.4.5.x86.etl:a669021c-c450-4609-a035-5af59af4df18:42": {
+      "metadata_missing": 350
+    },
+    "net.4.5.x86.etl:a669021c-c450-4609-a035-5af59af4df18:44": {
+      "metadata_missing": 2
+    },
+    "net.4.5.x86.etl:a669021c-c450-4609-a035-5af59af4df18:47": {
+      "metadata_missing": 15
+    },
+    "net.4.5.x86.etl:b3e675d7-2554-4f18-830b-2762732560de:0": {
+      "decoded": 3914
+    },
+    "net.4.5.x86.etl:b3e675d7-2554-4f18-830b-2762732560de:32": {
+      "metadata_missing": 4
+    },
+    "net.4.5.x86.etl:b3e675d7-2554-4f18-830b-2762732560de:36": {
+      "decoded": 3898
+    },
+    "net.4.5.x86.etl:b3e675d7-2554-4f18-830b-2762732560de:37": {
+      "metadata_missing": 32
+    },
+    "net.4.5.x86.etl:b3e675d7-2554-4f18-830b-2762732560de:64": {
+      "decoded": 694
+    },
+    "net.4.5.x86.etl:b675ec37-bdb6-4648-bc92-f3fdc74d3ca2:16": {
+      "decoded": 29
+    },
+    "net.4.5.x86.etl:b675ec37-bdb6-4648-bc92-f3fdc74d3ca2:17": {
+      "decoded": 29
+    },
+    "net.4.5.x86.etl:b675ec37-bdb6-4648-bc92-f3fdc74d3ca2:18": {
+      "decoded": 13
+    },
+    "net.4.5.x86.etl:bbccf6c1-6cd1-48c4-80ff-839482e37671:32": {
+      "partial": 11
+    },
+    "net.4.5.x86.etl:bbccf6c1-6cd1-48c4-80ff-839482e37671:33": {
+      "metadata_missing": 2
+    },
+    "net.4.5.x86.etl:bf3a50c5-a9c9-4988-a005-2df0b7c80f80:10": {
+      "metadata_missing": 2
+    },
+    "net.4.5.x86.etl:bf3a50c5-a9c9-4988-a005-2df0b7c80f80:11": {
+      "metadata_missing": 27
+    },
+    "net.4.5.x86.etl:bf3a50c5-a9c9-4988-a005-2df0b7c80f80:26": {
+      "metadata_missing": 2
+    },
+    "net.4.5.x86.etl:bf3a50c5-a9c9-4988-a005-2df0b7c80f80:27": {
+      "metadata_missing": 8
+    },
+    "net.4.5.x86.etl:ce1dbfb4-137e-4da6-87b0-3f59aa102cbc:46": {
+      "metadata_missing": 111587
+    },
+    "net.4.5.x86.etl:ce1dbfb4-137e-4da6-87b0-3f59aa102cbc:73": {
+      "metadata_missing": 1
+    },
+    "net.4.5.x86.etl:ce1dbfb4-137e-4da6-87b0-3f59aa102cbc:74": {
+      "metadata_missing": 1
+    },
+    "net.4.5.x86.etl:def2fe46-7bd6-4b80-bd94-f57fe20d0ce3:32": {
+      "decoded": 288
+    },
+    "net.4.5.x86.etl:def2fe46-7bd6-4b80-bd94-f57fe20d0ce3:35": {
+      "metadata_missing": 2120
+    },
+    "net.4.5.x86.etl:def2fe46-7bd6-4b80-bd94-f57fe20d0ce3:36": {
+      "metadata_missing": 1017
+    },
+    "net.4.5.x86.etl:def2fe46-7bd6-4b80-bd94-f57fe20d0ce3:37": {
+      "metadata_missing": 1092
+    },
+    "net.4.5.x86.etl:def2fe46-7bd6-4b80-bd94-f57fe20d0ce3:38": {
+      "metadata_missing": 6686
+    },
+    "net.4.5.x86.etl:e13c0d23-ccbc-4e12-931b-d9cc2eee27e4:1": {
+      "metadata_missing": 282
+    },
+    "net.4.5.x86.etl:e13c0d23-ccbc-4e12-931b-d9cc2eee27e4:10": {
+      "metadata_missing": 272
+    },
+    "net.4.5.x86.etl:e13c0d23-ccbc-4e12-931b-d9cc2eee27e4:11": {
+      "metadata_missing": 10711
+    },
+    "net.4.5.x86.etl:e13c0d23-ccbc-4e12-931b-d9cc2eee27e4:132": {
+      "metadata_missing": 272
+    },
+    "net.4.5.x86.etl:e13c0d23-ccbc-4e12-931b-d9cc2eee27e4:133": {
+      "metadata_missing": 271
+    },
+    "net.4.5.x86.etl:e13c0d23-ccbc-4e12-931b-d9cc2eee27e4:134": {
+      "metadata_missing": 2
+    },
+    "net.4.5.x86.etl:e13c0d23-ccbc-4e12-931b-d9cc2eee27e4:136": {
+      "metadata_missing": 272
+    },
+    "net.4.5.x86.etl:e13c0d23-ccbc-4e12-931b-d9cc2eee27e4:137": {
+      "metadata_missing": 272
+    },
+    "net.4.5.x86.etl:e13c0d23-ccbc-4e12-931b-d9cc2eee27e4:15": {
+      "metadata_missing": 274
+    },
+    "net.4.5.x86.etl:e13c0d23-ccbc-4e12-931b-d9cc2eee27e4:19": {
+      "metadata_missing": 274
+    },
+    "net.4.5.x86.etl:e13c0d23-ccbc-4e12-931b-d9cc2eee27e4:2": {
+      "metadata_missing": 277
+    },
+    "net.4.5.x86.etl:e13c0d23-ccbc-4e12-931b-d9cc2eee27e4:33": {
+      "metadata_missing": 2
+    },
+    "net.4.5.x86.etl:e13c0d23-ccbc-4e12-931b-d9cc2eee27e4:34": {
+      "metadata_missing": 2
+    },
+    "net.4.5.x86.etl:e13c0d23-ccbc-4e12-931b-d9cc2eee27e4:37": {
+      "metadata_missing": 39
+    },
+    "net.4.5.x86.etl:e13c0d23-ccbc-4e12-931b-d9cc2eee27e4:38": {
+      "metadata_missing": 3
+    },
+    "net.4.5.x86.etl:e13c0d23-ccbc-4e12-931b-d9cc2eee27e4:41": {
+      "metadata_missing": 2
+    },
+    "net.4.5.x86.etl:e13c0d23-ccbc-4e12-931b-d9cc2eee27e4:42": {
+      "metadata_missing": 37
+    },
+    "net.4.5.x86.etl:e13c0d23-ccbc-4e12-931b-d9cc2eee27e4:45": {
+      "metadata_missing": 1
+    },
+    "net.4.5.x86.etl:e13c0d23-ccbc-4e12-931b-d9cc2eee27e4:82": {
+      "metadata_missing": 11069
+    },
+    "net.4.5.x86.etl:e13c0d23-ccbc-4e12-931b-d9cc2eee27e4:87": {
+      "metadata_missing": 34
+    },
+    "net.4.5.x86.etl:edd08927-9cc4-4e65-b970-c2560fb5c289:0": {
+      "decoded": 287
+    }
+  },
+  "roundtrip_mismatch_counts": {},
+  "roundtrip_mismatch_examples": [],
+  "output_sha256": "b303bf884273c6eb00c8f822b635cfccfb17e6616699a9df7335251ad1d2728d"
+}

@@ -1,0 +1,88 @@
+{
+  "scope": "Portable managed replay of independently read public Windows ETLs. This is not native Windows reader, TDH, ProcessTrace, UTC, symbolization, or acquisition-completeness validation.",
+  "recorded_utc": "2026-10-21T08:19:36.339493+00:00",
+  "application_source_commit": "f6d8db5722637d4a87d39b1f95423202cc097757",
+  "application_source_commit_utc": "2026-10-21T08:14:42Z",
+  "build": {
+    "configuration": "Release",
+    "target_framework": "net10.0-windows",
+    "command": "dotnet build tests/ETW2JSON.CorpusReplay/ETW2JSON.CorpusReplay.csproj -c Release --no-restore",
+    "note": "Build was invoked after the final empty-template fix. Replay start/finish timestamps and assembly hashes identify the executed build. The SDK can retain earlier timestamps for unchanged incremental outputs.",
+    "decoder_assembly_sha256": "58fc529840accd96369059c6dd504ee951877175c0e99d70a0126d0f871c8c3a",
+    "helper_assembly_sha256": "b418f7e550b2d60e77032ec1ca296a1344e3533c772c2c7db2fd2c92449132ee"
+  },
+  "public_corpus": {
+    "source_repository": "https://github.com/microsoft/perfview",
+    "source_commit": "29b21620a6c295979e83dc99008262ad2f3c6a2d",
+    "provenance_manifest": "../../../tests/ETW2JSON.CorpusReplay/corpus-manifest.json",
+    "license": "MIT, .NET Foundation and Contributors",
+    "external_reference_reader": "dissect.etl 3.14, independent AGPL-licensed tool; not copied or linked"
+  },
+  "path_mapping": {
+    "${CORPUS_DIR}": "Temporary corpus directory outside the checkout. Local absolute paths were replaced only in saved summary metadata; output_sha256 still refers to the original unmodified replay JSONL."
+  },
+  "runs": {
+    "full-default": {
+      "started_utc": "2026-10-21T08:15:08.678777+00:00",
+      "finished_utc": "2026-10-21T08:15:18.865371+00:00",
+      "elapsed_seconds": 10.18657399299991,
+      "maximum_resident_set_kib": 215724,
+      "exit_code": 0
+    },
+    "full-clr-manifest": {
+      "started_utc": "2026-10-21T08:15:18.866434+00:00",
+      "finished_utc": "2026-10-21T08:15:30.364431+00:00",
+      "elapsed_seconds": 11.497976478000055,
+      "maximum_resident_set_kib": 219440,
+      "exit_code": 0
+    },
+    "gcevents-clr-manifest": {
+      "started_utc": "2026-10-21T08:15:30.364626+00:00",
+      "finished_utc": "2026-10-21T08:15:30.797027+00:00",
+      "elapsed_seconds": 0.4323920750002799,
+      "maximum_resident_set_kib": 66172,
+      "exit_code": 0
+    }
+  },
+  "artifacts": {
+    "full-default.summary.json": {
+      "sha256": "0e98b1a0349c603a660eb653bbcc3426bb931bcf6455a3899ab6bd4f23815e00",
+      "bytes": 14191
+    },
+    "full-clr-manifest.summary.json": {
+      "sha256": "3c7baa58310249135299c52dd59bd11ebc354d6d733a186cc6b1b03898f74b7e",
+      "bytes": 14093
+    },
+    "gcevents-clr-manifest.summary.json": {
+      "sha256": "9342700a1ffb418f68741bfd9c4c9ceda1fea70259afa2221ec25286295971fd",
+      "bytes": 3547
+    },
+    "full-default.reference-comparison.json": {
+      "sha256": "14e294c753b7ab18955c61cd6aacdbb8193de5023354dd83f9ca6f8a6e8c0446",
+      "bytes": 825
+    },
+    "full-clr-manifest.reference-comparison.json": {
+      "sha256": "14e294c753b7ab18955c61cd6aacdbb8193de5023354dd83f9ca6f8a6e8c0446",
+      "bytes": 825
+    },
+    "gcevents.baseline-comparison.json": {
+      "sha256": "945071437242d40ae1c5d52ae745db1a4b1972297c16a100b99b617bb1cc9834",
+      "bytes": 8151
+    },
+    "stacks-comparison.json": {
+      "sha256": "4548b44c1c3c461745fc886518ec3e49a86933041fce8a9ca034369277dda2bb",
+      "bytes": 322
+    },
+    "empty-template-error-comparison.json": {
+      "sha256": "17662d58ab9009cda28cb50cfcfb1e710cfdb7afb30420115dac0c46177fe842",
+      "bytes": 844
+    }
+  },
+  "limitations": [
+    "No TraceLogging records were present in the large or CLR-only replay inputs. The replay helper skips them when present and cannot validate native TL decoding.",
+    "Raw conservation checks do not establish property correctness. Independently compared field counts are in the classic, CLR-baseline and stack reports.",
+    "The 271 empty-template records remain decoding errors with all 425 payload bytes explicitly undescribed; the supplied manifest is not a complete schema.",
+    "PerfView performance/test traces do not represent incident-response provider/version coverage."
+  ],
+  "replayed_source_state": "Application and replay helper .cs/.csproj matched the recorded source commit at replay time. Later edits to validation tools or documentation do not change the executed assemblies identified below."
+}
