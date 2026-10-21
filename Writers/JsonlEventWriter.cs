@@ -69,6 +69,8 @@ namespace ETW2JSON
             w.WriteString("timestamp", FormatTimestamp(runtimeMetadata.Timestamp));
             w.WriteNumber("raw_timestamp", runtimeMetadata.RawTimestamp);
             WriteTraceClock(w, runtimeMetadata.TraceClock);
+            EventHeaderJsonWriter.Write(w, runtimeMetadata);
+            ExtendedDataJsonWriter.Write(w, runtimeMetadata);
             w.WriteString("provider_guid", metadata.ProviderGuid.ToString("D"));
             WriteName(w, "provider_name", this.GetProviderName(metadata));
             w.WriteNumber("event_id", metadata.Id);
@@ -99,6 +101,22 @@ namespace ETW2JSON
             else
             {
                 w.WriteNull("related_activity_id");
+            }
+
+            var stacks = runtimeMetadata.GetStacks(out ulong stackMatchId);
+            if (stackMatchId != 0)
+            {
+                w.WriteNumber("stack_match_id", stackMatchId);
+            }
+            if (stacks != null)
+            {
+                w.WritePropertyName("stacks");
+                w.WriteStartArray();
+                foreach (ulong address in stacks)
+                {
+                    w.WriteNumberValue(address);
+                }
+                w.WriteEndArray();
             }
 
             w.WriteString("event_name", metadata.Name);

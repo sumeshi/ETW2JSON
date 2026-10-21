@@ -99,9 +99,9 @@
         //
         // following variables are filled for BufferCallback.
         //
-        public LONG BufferSize;
-        public LONG Filled;
-        public LONG EventsLost;
+        public ULONG BufferSize;
+        public ULONG Filled;
+        public ULONG EventsLost;
         //
         // following needs to be propaged to each buffer
         //
@@ -117,7 +117,7 @@
     [StructLayout(LayoutKind.Sequential, Size = 0xAC, CharSet = CharSet.Unicode)]
     internal struct TIME_ZONE_INFORMATION
     {
-        public ULONG Bias;
+        public LONG Bias;
 
         [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)]
         public string StandardName;
@@ -125,7 +125,7 @@
         [MarshalAs(UnmanagedType.ByValArray, ArraySubType = UnmanagedType.U2, SizeConst = 8)]
         public USHORT[] StandardDate;
 
-        public ULONG StandardBias;
+        public LONG StandardBias;
 
         [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)]
         public string DaylightName;
@@ -133,7 +133,7 @@
         [MarshalAs(UnmanagedType.ByValArray, ArraySubType = UnmanagedType.U2, SizeConst = 8)]
         public USHORT[] DaylightDate;
 
-        public ULONG DaylightBias;
+        public LONG DaylightBias;
     }
 
     internal delegate bool PEVENT_TRACE_BUFFER_CALLBACKW([In] IntPtr logfile);

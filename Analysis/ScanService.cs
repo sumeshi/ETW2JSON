@@ -48,7 +48,7 @@ namespace ETW2JSON.Analysis
         public void Observe(string source, EventKey key, IEventTraceOperand operand)
         {
             this.Observe(key, operand);
-            var scanKey = new ScanKey(key.ProviderGuid, key.EventId, key.Version);
+            var scanKey = new ScanKey(key.ProviderGuid, key.EventId, key.Version, key.ClassicOpcode);
             string sourceKey = source ?? string.Empty;
             if (!this.sourceFiles.TryGetValue(scanKey, out var sources))
             {
@@ -63,10 +63,19 @@ namespace ETW2JSON.Analysis
             }
             var metadata = operand?.Metadata;
             var observation = new SourceObservation(metadata?.ProviderName, metadata?.MetadataSource ?? MetadataSource.Unknown,
-                metadata?.ResolutionStatus ?? ResolutionStatus.Missing, metadata?.DecodeReason, metadata);
-            if (!bySource.TryGetValue(sourceKey, out var existing) || IsBetterObservation(observation.Status, existing.Status))
+                metadata?.ResolutionStatus ?? ResolutionStatus.Missing, metadata?.DecodeReason, operand);
+            if (!bySource.TryGetValue(sourceKey, out var existing))
             {
                 bySource[sourceKey] = observation;
+            }
+            else if (IsBetterObservation(observation.Status, existing.Status))
+            {
+                observation.RecordSpecificFailureReason ??= existing.RecordSpecificFailureReason;
+                bySource[sourceKey] = observation;
+            }
+            else
+            {
+                existing.RecordSpecificFailureReason ??= observation.RecordSpecificFailureReason;
             }
         }
 
@@ -78,18 +87,27 @@ namespace ETW2JSON.Analysis
                 var resolvedBySource = new List<SourceObservation>();
                 bool conflicting = false;
                 bool missing = false;
+                string mixedRecordReason = null;
                 foreach (string source in sources)
                 {
                     resolver.SetCurrentSource(source);
                     SourceObservation observed = null;
                     if (this.observations.TryGetValue(pair.Key, out var bySource)) bySource.TryGetValue(source, out observed);
-                    if (observed != null && (observed.Source == MetadataSource.TraceLogging || IsHeaderUnsupported(observed.Metadata)))
+                    if (observed?.Status == ResolutionStatus.Resolved && observed.RecordSpecificFailureReason != null)
+                    {
+                        mixedRecordReason ??= observed.RecordSpecificFailureReason;
+                    }
+                    if (observed != null && (observed.Source == MetadataSource.TraceLogging || observed.Source == MetadataSource.BuiltinParser || IsHeaderUnsupported(observed.Metadata)))
                     {
                         resolvedBySource.Add(observed);
                         continue;
                     }
 
-                    var result = resolver.Resolve(new EventKey(pair.Key.ProviderGuid, pair.Key.EventId, pair.Key.Version));
+                    var result = resolver.Resolve(new EventKey(pair.Key.ProviderGuid, pair.Key.EventId, pair.Key.Version, pair.Key.ClassicOpcode));
+                    if (result.Resolved && observed?.RecordSpecificFailureReason != null)
+                    {
+                        mixedRecordReason ??= observed.RecordSpecificFailureReason;
+                    }
                     if (result.Status == ResolutionStatus.Conflict)
                     {
                         resolvedBySource.Add(new SourceObservation(null, result.Source, result.Status, result.Reason, null));
@@ -98,7 +116,7 @@ namespace ETW2JSON.Analysis
                         || SourcePriority(result.Source) >= SourcePriority(observed.Source)))
                     {
                         resolvedBySource.Add(new SourceObservation(result.Operand.Metadata.ProviderName, result.Source, result.Status,
-                            result.Reason ?? result.Operand.Metadata.DecodeReason, result.Operand.Metadata));
+                            result.Reason ?? result.Operand.Metadata.DecodeReason, result.Operand));
                     }
                     else if (observed != null && observed.Status != ResolutionStatus.Missing)
                     {
@@ -119,7 +137,11 @@ namespace ETW2JSON.Analysis
                         conflicting = true;
                         break;
                     }
-                    if ((first.Metadata != null && other.Metadata != null && !Equivalent(first.Metadata, other.Metadata))
+                    // TraceLogging carries a schema per record, so valid records
+                    // sharing an ID/version may legitimately have different shapes.
+                    bool perRecordSchemas = first.Source == MetadataSource.TraceLogging && other.Source == MetadataSource.TraceLogging;
+                    if ((!perRecordSchemas && first.Operand != null && other.Operand != null
+                            && !SchemaEquivalence.AreEquivalent(first.Operand, other.Operand))
                         || first.Status != other.Status)
                     {
                         conflicting = true;
@@ -131,6 +153,12 @@ namespace ETW2JSON.Analysis
                 {
                     pair.Value.RefreshMetadata(null, first.Source, ResolutionStatus.Conflict,
                         "Conflicting or different metadata outcomes were found across input ETL sources.");
+                }
+                else if (mixedRecordReason != null)
+                {
+                    pair.Value.RefreshStatus("Mixed", first.Source,
+                        "Some records with this provider/event/version have usable metadata, while others have unsupported or invalid per-event metadata. "
+                        + "Payload decoding has not been validated by this scan. Example: " + mixedRecordReason);
                 }
                 else if (missing)
                 {
@@ -161,6 +189,7 @@ namespace ETW2JSON.Analysis
         {
             MetadataSource.Embedded => 7,
             MetadataSource.TraceLogging => 8,
+            MetadataSource.BuiltinParser => 8,
             MetadataSource.ExternalManifest => 6,
             MetadataSource.ExternalPeResource => 5,
             MetadataSource.OfflineRegistryResolved => 5,
@@ -177,36 +206,36 @@ namespace ETW2JSON.Analysis
 
         private sealed class SourceObservation
         {
-            public SourceObservation(string providerName, MetadataSource source, ResolutionStatus status, string reason, EventMetadata metadata)
+            public SourceObservation(string providerName, MetadataSource source, ResolutionStatus status, string reason, IEventTraceOperand operand)
             {
                 this.ProviderName = providerName;
                 this.Source = source;
                 this.Status = status;
                 this.Reason = reason;
-                this.Metadata = metadata;
+                this.Operand = operand;
+                // A later manifest can resolve an earlier missing schema, but it
+                // cannot repair an unsupported header or a different TraceLogging
+                // event's self-describing schema. Keep such failures even if a
+                // supported record shares its provider/event/version tuple.
+                if (status == ResolutionStatus.Invalid
+                    || status != ResolutionStatus.Resolved && (source == MetadataSource.TraceLogging || IsHeaderUnsupported(this.Metadata)))
+                {
+                    this.RecordSpecificFailureReason = reason ?? "The per-event schema could not be resolved.";
+                }
             }
             public string ProviderName { get; }
             public MetadataSource Source { get; }
             public ResolutionStatus Status { get; }
             public string Reason { get; }
-            public EventMetadata Metadata { get; }
-        }
+            public IEventTraceOperand Operand { get; }
 
-        private static bool Equivalent(EventMetadata left, EventMetadata right)
-        {
-            if (left == null || right == null || left.Name != right.Name || left.Properties.Length != right.Properties.Length) return false;
-            for (int i = 0; i < left.Properties.Length; i++)
-            {
-                var a = left.Properties[i];
-                var b = right.Properties[i];
-                if (a.Name != b.Name || a.InType != b.InType || a.OutType != b.OutType) return false;
-            }
-            return true;
+            public EventMetadata Metadata => this.Operand?.Metadata;
+            public string RecordSpecificFailureReason { get; set; }
         }
 
         private void Observe(EventKey key, string providerName, MetadataSource source, ResolutionStatus status, string reason)
         {
-            var scanned = new ScanKey(key.ProviderGuid, key.EventId, key.Version);
+            var scanned = new ScanKey(key.ProviderGuid, key.EventId, key.Version, key.ClassicOpcode);
             if (!this.entries.TryGetValue(scanned, out var entry))
             {
                 entry = new ScanEntry(scanned);
@@ -231,6 +260,7 @@ namespace ETW2JSON.Analysis
                 writer.WriteLine();
                 writer.WriteLine("Events:");
                 writer.WriteLine("  ID " + entry.Key.EventId + " Version " + entry.Key.Version + ": " + entry.Count);
+                if (entry.Key.ClassicOpcode.HasValue) writer.WriteLine("  Classic/MOF opcode: " + entry.Key.ClassicOpcode.Value);
                 writer.WriteLine();
                 writer.WriteLine("Metadata:");
                 writer.WriteLine("  Status: " + entry.MetadataStatus);
@@ -274,6 +304,7 @@ namespace ETW2JSON.Analysis
                     writer.WriteStartObject();
                     writer.WriteNumber("event_id", entry.Key.EventId);
                     writer.WriteNumber("version", entry.Key.Version);
+                    if (entry.Key.ClassicOpcode.HasValue) writer.WriteNumber("classic_opcode", entry.Key.ClassicOpcode.Value);
                     writer.WriteNumber("count", entry.Count);
                     writer.WriteString("metadata_status", entry.MetadataStatus);
                     if (!string.IsNullOrEmpty(entry.Reason))
@@ -311,11 +342,12 @@ namespace ETW2JSON.Analysis
     /// <summary>Identity used by the scan for one provider/event/version tuple.</summary>
     public readonly struct ScanKey : IEquatable<ScanKey>
     {
-        public ScanKey(Guid providerGuid, ushort eventId, byte version)
+        public ScanKey(Guid providerGuid, ushort eventId, byte version, byte? classicOpcode = null)
         {
             this.ProviderGuid = providerGuid;
             this.EventId = eventId;
             this.Version = version;
+            this.ClassicOpcode = classicOpcode;
         }
 
         public Guid ProviderGuid { get; }
@@ -324,9 +356,11 @@ namespace ETW2JSON.Analysis
 
         public byte Version { get; }
 
+        public byte? ClassicOpcode { get; }
+
         public bool Equals(ScanKey other)
         {
-            return this.ProviderGuid.Equals(other.ProviderGuid) && this.EventId == other.EventId && this.Version == other.Version;
+            return this.ProviderGuid.Equals(other.ProviderGuid) && this.EventId == other.EventId && this.Version == other.Version && this.ClassicOpcode == other.ClassicOpcode;
         }
 
         public override bool Equals(object obj) => obj is ScanKey other && this.Equals(other);
@@ -338,6 +372,7 @@ namespace ETW2JSON.Analysis
                 var hashCode = this.ProviderGuid.GetHashCode();
                 hashCode = (hashCode * 397) ^ this.EventId.GetHashCode();
                 hashCode = (hashCode * 397) ^ this.Version.GetHashCode();
+                if (this.ClassicOpcode.HasValue) hashCode = (hashCode * 397) ^ (256 + this.ClassicOpcode.Value);
                 return hashCode;
             }
         }

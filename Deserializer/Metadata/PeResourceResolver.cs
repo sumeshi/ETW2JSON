@@ -66,6 +66,11 @@ namespace ETWDeserializer
 
         public ResolutionResult Resolve(EventKey key)
         {
+            if (key.ClassicOpcode.HasValue)
+            {
+                return ResolutionResult.UnresolvedResult(ResolutionStatus.Missing, MetadataSource.ExternalPeResource, null,
+                    "Manifest PE resources do not supply classic/MOF class schemas; recover embedded trace metadata or the matching MOF definitions.");
+            }
             ResolutionResult diagnostic = null;
             ResolutionResult resolved = null;
             foreach (var image in this.images)
@@ -85,7 +90,7 @@ namespace ETWDeserializer
                         {
                             resolved = candidate;
                         }
-                        else if (!Equivalent(resolved.Operand.Metadata, candidate.Operand.Metadata))
+                        else if (!SchemaEquivalence.AreEquivalent(resolved.Operand, candidate.Operand))
                         {
                             return ResolutionResult.UnresolvedResult(ResolutionStatus.Conflict, MetadataSource.ExternalPeResource,
                                 resolved.Provenance + ";" + candidate.Provenance,
@@ -125,7 +130,7 @@ namespace ETWDeserializer
                                 {
                                     resolved = candidate;
                                 }
-                                else if (!Equivalent(resolved.Operand.Metadata, candidate.Operand.Metadata))
+                                else if (!SchemaEquivalence.AreEquivalent(resolved.Operand, candidate.Operand))
                                 {
                                     return ResolutionResult.UnresolvedResult(ResolutionStatus.Conflict, MetadataSource.ExternalPeResource,
                                         resolved.Provenance + ";" + candidate.Provenance,
@@ -348,29 +353,6 @@ namespace ETWDeserializer
             }
         }
 
-        private static bool Equivalent(EventMetadata left, EventMetadata right)
-        {
-            if (!string.Equals(left.Name, right.Name, StringComparison.Ordinal)
-                || left.ResolutionStatus != right.ResolutionStatus
-                || left.Properties.Length != right.Properties.Length)
-            {
-                return false;
-            }
-
-            for (int i = 0; i < left.Properties.Length; i++)
-            {
-                PropertyMetadata a = left.Properties[i];
-                PropertyMetadata b = right.Properties[i];
-                if (!string.Equals(a.Name, b.Name, StringComparison.Ordinal)
-                    || a.InType != b.InType || a.OutType != b.OutType
-                    || a.IsStruct != b.IsStruct || a.ChildrenCount != b.ChildrenCount)
-                {
-                    return false;
-                }
-            }
-
-            return true;
-        }
 
         private static string FormatResourceLocation(PeResourceEntry resource)
         {

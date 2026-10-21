@@ -45,6 +45,11 @@ namespace ETWDeserializer
 
         public ResolutionResult Resolve(EventKey key)
         {
+            if (key.ClassicOpcode.HasValue)
+            {
+                return ResolutionResult.UnresolvedResult(ResolutionStatus.Missing, MetadataSource.ExternalManifest, null,
+                    "Event manifests do not supply classic/MOF class schemas; recover embedded trace metadata or the matching MOF definitions.");
+            }
             ResolutionResult match = null;
             foreach (var entry in this.manifests)
             {
@@ -61,7 +66,7 @@ namespace ETWDeserializer
                     {
                         match = candidate;
                     }
-                    else if (!Equivalent(match.Operand.Metadata, candidate.Operand.Metadata))
+                    else if (!SchemaEquivalence.AreEquivalent(match.Operand, candidate.Operand))
                     {
                         return ResolutionResult.UnresolvedResult(
                             ResolutionStatus.Conflict,
@@ -75,31 +80,6 @@ namespace ETWDeserializer
             return match ?? ResolutionResult.UnresolvedResult(ResolutionStatus.Missing, MetadataSource.ExternalManifest, null, "No supplied manifest contains a matching provider/event/version.");
         }
 
-        private static bool Equivalent(EventMetadata left, EventMetadata right)
-        {
-            if (!string.Equals(left.Name, right.Name, StringComparison.Ordinal)
-                || left.ResolutionStatus != right.ResolutionStatus
-                || left.Properties.Length != right.Properties.Length)
-            {
-                return false;
-            }
-
-            for (int i = 0; i < left.Properties.Length; i++)
-            {
-                var a = left.Properties[i];
-                var b = right.Properties[i];
-                if (!string.Equals(a.Name, b.Name, StringComparison.Ordinal)
-                    || a.InType != b.InType
-                    || a.OutType != b.OutType
-                    || a.IsStruct != b.IsStruct
-                    || a.ChildrenCount != b.ChildrenCount)
-                {
-                    return false;
-                }
-            }
-
-            return true;
-        }
 
         internal static instrumentationManifest LoadXml(string path, out string hash)
         {

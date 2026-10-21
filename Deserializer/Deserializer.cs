@@ -71,6 +71,10 @@
 
         internal Func<EventKey, IEventTraceOperand> LocalMetadataTestHook { get; set; }
 
+        internal unsafe delegate int EventInformationLookup(EVENT_RECORD* record, uint contextCount, IntPtr context, byte* buffer, ref uint bufferSize);
+
+        internal unsafe EventInformationLookup TdhInformationLookup { get; set; } = Tdh.GetEventInformation;
+
         /// <summary>First fatal callback/writer error, used to stop ProcessTrace cleanly.</summary>
         public Exception LastError { get; private set; }
 
@@ -136,17 +140,36 @@
                 string sourceFile = this.currentSourceFile ?? this.currentSourceFileFn?.Invoke(eventRecord->LoggerId) ?? this.SourceFile;
                 runtimeMetadata = new RuntimeEventMetadata(eventRecord, sourceFile, this.TraceClockLookup?.Invoke(sourceFile));
                 runtimeReady = true;
+                string[] extendedErrors = runtimeMetadata.GetExtendedDataErrors();
+                if (extendedErrors.Length != 0)
+                {
+                    bool traceLogging = Array.Exists(runtimeMetadata.GetRawExtendedData(), item => item.ExtType == Etw.EVENT_HEADER_EXT_TYPE_EVENT_SCHEMA_TL);
+                    var metadata = new EventMetadata(runtimeMetadata.ProviderId, runtimeMetadata.EventId, runtimeMetadata.Version,
+                        "InvalidExtendedData(" + runtimeMetadata.ProviderId.ToString("D") + ")", Array.Empty<PropertyMetadata>(), null,
+                        traceLogging ? MetadataSource.TraceLogging : MetadataSource.Unknown, DecodeStatus.DecodeError,
+                        "etl:extended-data-validation", (traceLogging ? "Invalid TraceLogging extended event metadata: " : "Invalid extended event metadata: ")
+                            + string.Join("; ", extendedErrors), ResolutionStatus.Invalid);
+                    observedOperand = new EventTraceOperand(metadata, 0, Array.Empty<IEventTracePropertyOperand>());
+                    if (!this.SchemaOnly)
+                    {
+                        this.writer.WriteEventBegin(metadata, runtimeMetadata);
+                        this.writer.WriteEventEnd();
+                    }
+                    this.ObserveSafely(GetRecordKey(eventRecord), observedOperand);
+                    return;
+                }
                 key = new TraceEventKey(
                     eventRecord->ProviderId,
                     (eventRecord->Flags & Etw.EVENT_HEADER_FLAG_CLASSIC_HEADER) != 0 ? eventRecord->Opcode : eventRecord->Id,
-                    eventRecord->Version);
+                    eventRecord->Version,
+                    (eventRecord->Flags & Etw.EVENT_HEADER_FLAG_CLASSIC_HEADER) != 0);
 
                 string unsupportedHeaderReason = GetUnsupportedHeaderReason(eventRecord->Flags);
                 if (unsupportedHeaderReason != null)
                 {
                     var unsupported = BuildUnsupportedHeaderOperand(eventRecord, unsupportedHeaderReason);
                     observedOperand = unsupported;
-                    var unsupportedKey = new EventKey(eventRecord->ProviderId, eventRecord->Id, eventRecord->Version);
+                    var unsupportedKey = GetRecordKey(eventRecord);
                     if (!this.SchemaOnly)
                     {
                         this.writer.WriteEventBegin(unsupported.Metadata, runtimeMetadata);
@@ -156,8 +179,11 @@
                     return;
                 }
 
-                var sourceKey = new EventKey(eventRecord->ProviderId, eventRecord->Id, eventRecord->Version);
-                if (this.ResolverChain is PreflightMetadata scopedPreflight
+                var sourceKey = GetRecordKey(eventRecord);
+                // Self-describing records resolve their own schema before any
+                // external lookup, even when external definitions conflict.
+                if (!HasTraceLoggingSchema(eventRecord) && !HasBuiltinParser(eventRecord)
+                    && this.ResolverChain is PreflightMetadata scopedPreflight
                     && scopedPreflight.Resolve(sourceKey).Status == ResolutionStatus.Conflict)
                 {
                     var conflict = BuildSchemaConflictOperand(eventRecord, scopedPreflight.Resolve(sourceKey));
@@ -198,7 +224,7 @@
                 }
 
                 observedOperand ??= BuildUnknownOperand(eventRecord, 0);
-                var observedKey = new EventKey(eventRecord->ProviderId, eventRecord->Id, eventRecord->Version);
+                var observedKey = GetRecordKey(eventRecord);
                 this.ObserveSafely(observedKey, observedOperand);
             }
             catch (Exception ex)
@@ -217,6 +243,19 @@
             return null;
         }
 
+        private static unsafe EventKey GetRecordKey(EVENT_RECORD* record)
+        {
+            return new EventKey(record->ProviderId, record->Id, record->Version,
+                (record->Flags & Etw.EVENT_HEADER_FLAG_CLASSIC_HEADER) != 0 ? record->Opcode : (byte?)null);
+        }
+
+        private static unsafe EventKey GetEmbeddedSchemaKey(TRACE_EVENT_INFO* info)
+        {
+            bool classic = info->EventGuid != Guid.Empty;
+            return new EventKey(classic ? info->EventGuid : info->ProviderGuid, classic ? (ushort)0 : info->Id,
+                info->Version, classic ? info->Opcode : (byte?)null);
+        }
+
         private static unsafe IEventTraceOperand BuildUnsupportedHeaderOperand(EVENT_RECORD* eventRecord, string reason)
         {
             var metadata = new EventMetadata(eventRecord->ProviderId, eventRecord->Id, eventRecord->Version,
@@ -229,9 +268,16 @@
         {
             var metadata = new EventMetadata(eventRecord->ProviderId, eventRecord->Id, eventRecord->Version,
                 "ConflictingSchema(" + eventRecord->ProviderId.ToString("D") + ")", Array.Empty<PropertyMetadata>(), null,
-                MetadataSource.Embedded, DecodeStatus.DecodeError, result.Provenance,
-                result.Reason ?? "Conflicting embedded schemas are available for this source.", ResolutionStatus.Conflict);
+                result.Source, DecodeStatus.DecodeError, result.Provenance,
+                result.Reason ?? "Conflicting schemas are available for this source.", ResolutionStatus.Conflict);
             return new EventTraceOperand(metadata, 0, Array.Empty<IEventTracePropertyOperand>());
+        }
+
+        private static unsafe IEventTraceOperand BuildMetadataContainerOperand(EVENT_RECORD* record, int index, string name, string reason)
+        {
+            var metadata = new EventMetadata(record->ProviderId, record->Id, record->Version, name, Array.Empty<PropertyMetadata>(), null,
+                MetadataSource.Embedded, DecodeStatus.Partial, "etl:metadata-container:" + name, reason, ResolutionStatus.Resolved);
+            return new EventTraceOperand(metadata, index, Array.Empty<IEventTracePropertyOperand>());
         }
 
         private static bool IsRecoverableDecodeException(Exception exception)
@@ -290,7 +336,7 @@
                     knownOperand?.Metadata.Provenance,
                     exception.GetType().Name + ": " + exception.Message,
                     knownOperand?.Metadata.ResolutionStatus ?? ResolutionStatus.Invalid);
-                var key = new EventKey(eventRecord->ProviderId, eventRecord->Id, eventRecord->Version);
+                var key = GetRecordKey(eventRecord);
                 this.ObserveSafely(key, new EventTraceOperand(metadata, 0, Array.Empty<IEventTracePropertyOperand>()));
                 if (!this.SchemaOnly)
                 {
@@ -307,6 +353,7 @@
 
         private unsafe IEventTraceOperand BuildOperandFromXml(EVENT_RECORD* eventRecord, Dictionary<Guid, EventSourceManifest> cache, EventRecordReader eventRecordReader, int metadataTableIndex)
         {
+            if ((eventRecord->Flags & Etw.EVENT_HEADER_FLAG_CLASSIC_HEADER) != 0) return null;
             EventSourceManifest manifest;
             Guid providerGuid = eventRecord->ProviderId;
             if (IsEventSourceManifestRecord(eventRecord))
@@ -358,15 +405,28 @@
         {
             for (int i = 0; i < eventRecord->ExtendedDataCount; i++)
             {
-                if (eventRecord->ExtendedData[i].ExtType == Etw.EVENT_HEADER_EXT_TYPE_EVENT_SCHEMA_TL
-                    && eventRecord->ExtendedData[i].DataSize > 0
-                    && eventRecord->ExtendedData[i].DataPtr != 0)
+                if (eventRecord->ExtendedData[i].ExtType == Etw.EVENT_HEADER_EXT_TYPE_EVENT_SCHEMA_TL)
                 {
                     return true;
                 }
             }
 
             return false;
+        }
+
+        private static unsafe string GetTraceLoggingSchemaError(EVENT_RECORD* eventRecord)
+        {
+            for (int i = 0; i < eventRecord->ExtendedDataCount; i++)
+            {
+                ref EVENT_HEADER_EXTENDED_DATA_ITEM item = ref eventRecord->ExtendedData[i];
+                if ((item.ExtType == Etw.EVENT_HEADER_EXT_TYPE_EVENT_SCHEMA_TL || item.ExtType == Etw.EVENT_HEADER_EXT_TYPE_PROV_TRAITS)
+                    && (item.DataSize < sizeof(ushort) || item.DataPtr == 0))
+                {
+                    return "TraceLogging schema or provider traits are empty, truncated, or unavailable.";
+                }
+            }
+
+            return null;
         }
 
         private static unsafe string GetTraceLoggingSchemaIdentity(EVENT_RECORD* eventRecord)
@@ -410,7 +470,7 @@
             }
         }
 
-        private static unsafe IEventTraceOperand BuildOperandFromTdh(EVENT_RECORD* eventRecord, int metadataTableIndex, bool allowAnalysisHostMetadata)
+        private unsafe IEventTraceOperand BuildOperandFromTdh(EVENT_RECORD* eventRecord, int metadataTableIndex, bool allowAnalysisHostMetadata)
         {
             bool hasTraceLoggingSchema = HasTraceLoggingSchema(eventRecord);
             // Normal decoding only consults TDH when the record itself carries its
@@ -420,40 +480,50 @@
                 return null;
             }
 
-            uint bufferSize;
+            string schemaError = hasTraceLoggingSchema ? GetTraceLoggingSchemaError(eventRecord) : null;
+            if (schemaError != null)
+            {
+                return BuildTdhFailureOperand(eventRecord, metadataTableIndex, true, schemaError);
+            }
+
+            uint bufferSize = 0;
             byte* buffer = (byte*)0;
 
             // Not Found
-            int status = Tdh.GetEventInformation(eventRecord, 0, IntPtr.Zero, buffer, out bufferSize);
+            int status = this.TdhInformationLookup(eventRecord, 0, IntPtr.Zero, buffer, ref bufferSize);
             if (status != 122 && status != 0)
             {
-                return null;
+                return hasTraceLoggingSchema
+                    ? BuildTdhFailureOperand(eventRecord, metadataTableIndex, true, "TDH could not resolve the TraceLogging schema (win32=" + status + ").")
+                    : null;
             }
 
             if (bufferSize > 16 * 1024 * 1024 || bufferSize < (uint)Marshal.OffsetOf(typeof(TRACE_EVENT_INFO), nameof(TRACE_EVENT_INFO.EventPropertyInfoArray)).ToInt32())
             {
-                return new UnknownOperandBuilder(eventRecord->ProviderId, eventRecord->Id, eventRecord->Version, metadataTableIndex, DecodeStatus.DecodeError, "TDH returned an invalid TRACE_EVENT_INFO buffer length.");
+                return BuildTdhFailureOperand(eventRecord, metadataTableIndex, hasTraceLoggingSchema, "TDH returned an invalid TRACE_EVENT_INFO buffer length.");
             }
 
             buffer = (byte*)Marshal.AllocHGlobal((int)bufferSize);
             uint allocatedSize = bufferSize;
             try
             {
-                status = Tdh.GetEventInformation(eventRecord, 0, IntPtr.Zero, buffer, out bufferSize);
+                status = this.TdhInformationLookup(eventRecord, 0, IntPtr.Zero, buffer, ref bufferSize);
                 if (status != 0)
                 {
-                    return null;
+                    return hasTraceLoggingSchema
+                        ? BuildTdhFailureOperand(eventRecord, metadataTableIndex, true, "TDH could not read the TraceLogging schema (win32=" + status + ").")
+                        : null;
                 }
 
                 if (bufferSize > allocatedSize || bufferSize > 16 * 1024 * 1024)
                 {
-                    return new UnknownOperandBuilder(eventRecord->ProviderId, eventRecord->Id, eventRecord->Version, metadataTableIndex, DecodeStatus.DecodeError, "TDH returned an inconsistent or oversized TRACE_EVENT_INFO size.");
+                    return BuildTdhFailureOperand(eventRecord, metadataTableIndex, hasTraceLoggingSchema, "TDH returned an inconsistent or oversized TRACE_EVENT_INFO size.");
                 }
 
                 var traceEventInfo = (TRACE_EVENT_INFO*)buffer;
                 if (!EventTraceOperandBuilder.IsValidTraceEventInfo(traceEventInfo, (int)bufferSize, out _))
                 {
-                    return new UnknownOperandBuilder(eventRecord->ProviderId, eventRecord->Id, eventRecord->Version, metadataTableIndex, DecodeStatus.DecodeError, "TDH returned malformed TRACE_EVENT_INFO.");
+                    return BuildTdhFailureOperand(eventRecord, metadataTableIndex, hasTraceLoggingSchema, "TDH returned malformed TRACE_EVENT_INFO.");
                 }
 
                 bool isTraceLogging = traceEventInfo->DecodingSource == DECODING_SOURCE.DecodingSourceTlg;
@@ -464,7 +534,16 @@
 
                 if (isTraceLogging)
                 {
+                    if (!DoesAnalysisHostIdentityMatchRecord(eventRecord, traceEventInfo))
+                    {
+                        return BuildTdhFailureOperand(eventRecord, metadataTableIndex, true, "TDH TraceLogging metadata does not match this provider/event/version record.");
+                    }
                     return EventTraceOperandBuilder.Build(traceEventInfo, metadataTableIndex, MetadataSource.TraceLogging, "tdh:embedded-tracelogging-schema");
+                }
+
+                if (hasTraceLoggingSchema)
+                {
+                    return BuildTdhFailureOperand(eventRecord, metadataTableIndex, true, "TDH did not return TraceLogging metadata for this self-describing record.");
                 }
 
                 if (!allowAnalysisHostMetadata) return null;
@@ -480,6 +559,23 @@
             {
                 Marshal.FreeHGlobal((IntPtr)buffer);
             }
+        }
+
+        private static unsafe IEventTraceOperand BuildTdhFailureOperand(EVENT_RECORD* eventRecord, int metadataTableIndex, bool hasTraceLoggingSchema, string reason)
+        {
+            if (!hasTraceLoggingSchema)
+            {
+                return new UnknownOperandBuilder(eventRecord->ProviderId, eventRecord->Id, eventRecord->Version,
+                    metadataTableIndex, DecodeStatus.DecodeError, reason);
+            }
+
+            // A failed per-record TraceLogging schema must not be replaced by a
+            // manifest or host registration that merely shares its header key.
+            var metadata = new EventMetadata(eventRecord->ProviderId, eventRecord->Id, eventRecord->Version,
+                "TraceLogging(" + eventRecord->ProviderId.ToString("D") + ")", Array.Empty<PropertyMetadata>(), null,
+                MetadataSource.TraceLogging, DecodeStatus.DecodeError, "tdh:embedded-tracelogging-schema",
+                "TraceLogging metadata could not be used: " + reason, ResolutionStatus.Invalid);
+            return new EventTraceOperand(metadata, metadataTableIndex, Array.Empty<IEventTracePropertyOperand>());
         }
 
         internal static unsafe bool DoesAnalysisHostIdentityMatchRecord(EVENT_RECORD* eventRecord, TRACE_EVENT_INFO* info)
@@ -532,7 +628,7 @@
             // { byte Format, byte MajorVersion, byte MinorVersion, byte Magic, ushort TotalChunks, ushort ChunkNumber } == 8 bytes, followed by the XML schema
             if (eventRecord->UserDataLength <= 8)
             {
-                return null;
+                throw new InvalidOperationException("EventSource metadata manifest chunk has no schema bytes.");
             }
 
             var format = eventRecordReader.ReadUInt8();
@@ -596,14 +692,15 @@
 
                 isSpecialKernelTraceMetaDataEvent = true;
                 var embeddedOperand = EventTraceOperandBuilder.Build(embeddedInfo, metadataTableIndex, MetadataSource.Embedded, "kerneltracecontrol");
-                var targetKey = new EventKey(embeddedInfo->ProviderGuid, embeddedInfo->EventGuid == Guid.Empty ? embeddedInfo->Id : embeddedInfo->Opcode, embeddedInfo->Version);
+                var targetKey = GetEmbeddedSchemaKey(embeddedInfo);
                 return this.CacheEmbeddedSchema(targetKey, embeddedOperand);
             }
 
             if (IsEventSourceManifestRecord(eventRecord))
             {
                 BuildOperandFromXml(eventRecord, this.eventSourceManifestCache, eventRecordReader, metadataTableIndex);
-                return new UnknownOperandBuilder(eventRecord->ProviderId, eventRecord->Id, eventRecord->Version, metadataTableIndex, DecodeStatus.Partial, "EventSource manifest chunk record; original bytes are retained.");
+                return BuildMetadataContainerOperand(eventRecord, metadataTableIndex, "EventSource/ManifestChunk",
+                    "Recognized EventSource metadata manifest chunk; original bytes are retained. The target manifest may still be incomplete.");
             }
 
             IEventTraceOperand operand;
@@ -621,7 +718,7 @@
 
             ResolutionResult diagnostic = null;
             // User-supplied evidence sources are consulted only after event-embedded schema.
-            EventKey key = new EventKey(eventRecord->ProviderId, eventRecord->Id, eventRecord->Version);
+            EventKey key = GetRecordKey(eventRecord);
             if (this.ResolverChain != null)
             {
                 var resolution = this.ResolverChain.Resolve(key);
@@ -669,62 +766,55 @@
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
-        private unsafe bool CustomParserLookup(EVENT_RECORD* eventRecord, ref TraceEventKey key)
+        private static unsafe bool HasBuiltinParser(EVENT_RECORD* record)
         {
-            bool success;
+            return record->ProviderId == CustomParserGuids.KernelTraceControlImageIdGuid && (record->Opcode == 0 || record->Opcode == 36 || record->Opcode == 64)
+                || record->ProviderId == CustomParserGuids.KernelStackWalkGuid && record->Opcode == 32;
+        }
 
-            // events added by KernelTraceControl.dll (i.e. Microsoft tools like WPR and PerfView)
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private unsafe bool CustomParserLookup(EVENT_RECORD* eventRecord, RuntimeEventMetadata runtimeMetadata, ref TraceEventKey key)
+        {
+            if (HasTraceLoggingSchema(eventRecord)) return false;
+            Action<EventRecordReader, T, EventMetadata[], RuntimeEventMetadata> parser = null;
+            EventMetadata template = null;
             if (eventRecord->ProviderId == CustomParserGuids.KernelTraceControlImageIdGuid)
             {
                 switch (eventRecord->Opcode)
                 {
                     case 0:
-                        this.actionTable.Add(key, new KernelTraceControlImageIdParser().Parse);
-                        success = true;
+                        parser = new KernelTraceControlImageIdParser().Parse;
+                        template = KernelTraceControlImageIdParser.SchemaMetadata;
                         break;
                     case 36:
-                        this.actionTable.Add(key, new KernelTraceControlDbgIdParser().Parse);
-                        success = true;
+                        parser = new KernelTraceControlDbgIdParser().Parse;
+                        template = KernelTraceControlDbgIdParser.SchemaMetadata;
                         break;
                     case 64:
-                        this.actionTable.Add(key, new KernelTraceControlImageIdFileVersionParser().Parse);
-                        success = true;
-                        break;
-                    default:
-                        success = false;
+                        parser = new KernelTraceControlImageIdFileVersionParser().Parse;
+                        template = KernelTraceControlImageIdFileVersionParser.SchemaMetadata;
                         break;
                 }
             }
-
-            // events by the Kernel Stack Walker (need this because the MOF events always says 32 stacks, but in reality there can be fewer or more
-            else if (eventRecord->ProviderId == CustomParserGuids.KernelStackWalkGuid)
+            else if (eventRecord->ProviderId == CustomParserGuids.KernelStackWalkGuid && eventRecord->Opcode == 32)
             {
-                if (eventRecord->Opcode == 32)
-                {
-                    this.actionTable.Add(key, new KernelStackWalkEventParser().Parse);
-                    success = true;
-                }
-                else
-                {
-                    success = false;
-                }
-            }
-            else
-            {
-                success = false;
+                parser = new KernelStackWalkEventParser().Parse;
+                template = KernelStackWalkEventParser.SchemaMetadata;
             }
 
-            return success;
+            if (parser == null) return false;
+            this.actionTable[key] = parser;
+            this.operandTable[key] = new EventTraceOperand(CustomParserMetadata.Bind(template, runtimeMetadata), 0, Array.Empty<IEventTracePropertyOperand>());
+            return true;
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
         private unsafe IEventTraceOperand SlowLookup(EVENT_RECORD* eventRecord, EventRecordReader eventRecordReader, RuntimeEventMetadata runtimeMetadata, ref TraceEventKey key, string traceLoggingIdentity)
         {
-            if (this.CustomParserLookup(eventRecord, ref key))
+            if (this.CustomParserLookup(eventRecord, runtimeMetadata, ref key))
             {
-                // Custom parsers have no schema operand, but remain observable as unknown metadata.
                 if (!this.SchemaOnly) this.actionTable[key](eventRecordReader, this.writer, this.eventMetadataTable, runtimeMetadata);
-                return BuildUnknownOperand(eventRecord, 0);
+                return this.operandTable[key];
             }
 
             bool isSpecialKernelTraceMetaDataEvent = false;
@@ -751,17 +841,14 @@
                 if (isSpecialKernelTraceMetaDataEvent)
                 {
                     var e = (TRACE_EVENT_INFO*)eventRecord->UserDataFixed;
-                    var metadataKey = new TraceEventKey(e->ProviderGuid, e->EventGuid == Guid.Empty ? e->Id : e->Opcode, e->Version);
+                    var schemaKey = GetEmbeddedSchemaKey(e);
+                    var metadataKey = new TraceEventKey(schemaKey.ProviderGuid, schemaKey.ClassicOpcode.HasValue ? schemaKey.ClassicOpcode.Value : schemaKey.EventId,
+                        schemaKey.Version, schemaKey.ClassicOpcode.HasValue);
                     this.operandTable[metadataKey] = operand;
                     this.actionTable.AddOrUpdate(metadataKey, action);
 
-                    var rawMetadataOperand = new UnknownOperandBuilder(
-                        eventRecord->ProviderId,
-                        eventRecord->Id,
-                        eventRecord->Version,
-                        this.eventMetadataTableList.Count,
-                        DecodeStatus.Partial,
-                        "Embedded KernelTraceControl schema record; original bytes are retained.");
+                    var rawMetadataOperand = BuildMetadataContainerOperand(eventRecord, this.eventMetadataTableList.Count,
+                        "KernelTraceControl/SchemaMetadata", "Recognized embedded KernelTraceControl schema metadata record; original bytes are retained.");
                     if (!this.SchemaOnly)
                     {
                         this.writer.WriteEventBegin(rawMetadataOperand.Metadata, runtimeMetadata);

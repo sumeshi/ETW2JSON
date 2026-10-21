@@ -21,7 +21,12 @@ jobs:
         run: dotnet build ETW2JSON.sln -c Release --no-restore
 
       - name: Test
-        run: dotnet test ETW2JSON.sln -c Release --no-build
+        run: dotnet test ETW2JSON.sln -c Release --no-build --logger "trx;LogFileName=tests.trx" --results-directory "${{ runner.temp }}/etw2json-results"
+
+      - name: Build independent Windows validator
+        run: |
+          dotnet restore tests/ETW2JSON.NativeValidation/ETW2JSON.NativeValidation.csproj --locked-mode
+          dotnet build tests/ETW2JSON.NativeValidation/ETW2JSON.NativeValidation.csproj -c Release --no-restore
 
       - name: Generate ETL fixtures and run Windows smoke checks
         shell: pwsh
@@ -29,3 +34,21 @@ jobs:
           ./tests/fixtures/Verify-EventSourceFixture.ps1 `
             -OutputDirectory "$env:RUNNER_TEMP/etw2json-fixture-${{ github.run_id }}" `
             -DotNetPath (Get-Command dotnet).Source
+
+      - name: Compare public ETL corpus with independent readers
+        shell: pwsh
+        run: |
+          ./tests/fixtures/Verify-ExternalCorpus.ps1 `
+            -OutputDirectory "$env:RUNNER_TEMP/etw2json-corpus-${{ github.run_id }}" `
+            -DotNetPath (Get-Command dotnet).Source
+
+      - name: Retain validation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: etw2json-validation-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/etw2json-results
+            ${{ runner.temp }}/etw2json-fixture-${{ github.run_id }}
+            ${{ runner.temp }}/etw2json-corpus-${{ github.run_id }}
+          retention-days: 14

@@ -2,7 +2,6 @@ namespace ETW2JSON.Readers
 {
     using System;
     using System.Collections.Generic;
-    using System.Runtime.InteropServices;
     using ETWDeserializer;
 
     /// <summary>
@@ -30,12 +29,19 @@ namespace ETW2JSON.Readers
         private readonly Deserializer<TWriter> deserializer;
         private readonly Action<string> reportError;
         private readonly Func<ushort, string> sourceLookup;
+        private readonly IWindowsEtwApi nativeApi;
 
         internal WindowsEtwReader(TWriter writer, Action<string> reportError, Func<ushort, string> sourceLookup)
+            : this(writer, reportError, sourceLookup, WindowsEtwApi.Instance)
+        {
+        }
+
+        internal WindowsEtwReader(TWriter writer, Action<string> reportError, Func<ushort, string> sourceLookup, IWindowsEtwApi nativeApi)
         {
             this.deserializer = new Deserializer<TWriter>(writer);
             this.reportError = reportError ?? (_ => { });
             this.sourceLookup = sourceLookup;
+            this.nativeApi = nativeApi ?? throw new ArgumentNullException(nameof(nativeApi));
             this.deserializer.SourceFileLookup = sourceLookup;
         }
 
@@ -69,36 +75,38 @@ namespace ETW2JSON.Readers
                     BufferCallback = this.deserializer.BufferCallback,
                     LogFileMode = global::ETW2JSON.Etw.PROCESS_TRACE_MODE_EVENT_RECORD | global::ETW2JSON.Etw.PROCESS_TRACE_MODE_RAW_TIMESTAMP,
                 };
-                ulong handle = global::ETW2JSON.Etw.OpenTrace(ref fileSession);
-                unchecked
+                var opened = this.nativeApi.OpenTrace(ref fileSession);
+                ulong handle = opened.Handle;
+                if (opened.IsInvalidHandle)
                 {
-                    if (handle == ulong.MaxValue)
-                    {
-                        this.reportError("ClosedOpenTraceError");
-                        return "Failed to open ETL file: " + inputFiles[i] + " (win32=" + Marshal.GetLastWin32Error() + ")";
-                    }
+                    this.reportError("ClosedOpenTraceError");
+                    return "Failed to open ETL file: " + inputFiles[i] + " (win32=" + opened.Error + ")";
                 }
 
                 try
                 {
                     var header = fileSession.LogfileHeader;
+                    if (header.EventsLost != 0 || header.BuffersLost != 0)
+                    {
+                        this.reportError(FormattableString.Invariant(
+                            $"WARNING: ETL reports collection loss for '{inputFiles[i]}': events_lost={header.EventsLost}; buffers_lost={header.BuffersLost}. Records lost during collection cannot appear in the output."));
+                    }
                     clockBySource[inputFiles[i]] = new TraceClockMetadata(header.PerfFreq, header.StartTime, header.BootTime, header.ReservedFlags);
                     this.deserializer.SetCurrentSource(inputFiles[i]);
-                    int result = global::ETW2JSON.Etw.ProcessTrace(new[] { handle }, 1, IntPtr.Zero, IntPtr.Zero);
+                    int result = this.nativeApi.ProcessTrace(handle);
                     if (this.deserializer.LastError != null)
                     {
                         return "Event callback failed: " + this.deserializer.LastError.GetType().Name + ": " + this.deserializer.LastError.Message;
                     }
-                if (result != 0)
-                {
-                    return "ProcessTrace failed (win32=" + result + ").";
-                }
-
-                    GC.KeepAlive(fileSession);
+                    if (result != 0)
+                    {
+                        return "ProcessTrace failed for ETL file: " + inputFiles[i] + " (win32=" + result + ").";
+                    }
                 }
                 finally
                 {
-                    global::ETW2JSON.Etw.CloseTrace(handle);
+                    this.nativeApi.CloseTrace(handle);
+                    GC.KeepAlive(fileSession);
                 }
             }
 

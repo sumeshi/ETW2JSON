@@ -38,6 +38,10 @@
 
         private readonly ulong stackMatchId;
 
+        private readonly ExtendedEventData[] rawExtendedData;
+
+        private readonly string[] extendedDataErrors;
+
         internal unsafe RuntimeEventMetadata(EVENT_RECORD* eventRecord)
             : this(eventRecord, null, null)
         {
@@ -69,43 +73,12 @@
                 this.rawPayload = Array.Empty<byte>();
             }
 
-            this.relatedActivityId = Guid.Empty;
-            this.stacks = null;
-            this.stackMatchId = 0;
-            var extended = eventRecord->ExtendedData;
-            for (int i = 0; extended != null && i < eventRecord->ExtendedDataCount; i++)
-            {
-                ref EVENT_HEADER_EXTENDED_DATA_ITEM item = ref extended[i];
-                byte* data = (byte*)item.DataPtr;
-                if (data == null)
-                {
-                    continue;
-                }
-
-                if (item.ExtType == Etw.EVENT_HEADER_EXT_TYPE_RELATED_ACTIVITYID && item.DataSize >= sizeof(Guid))
-                {
-                    this.relatedActivityId = *((Guid*)data);
-                }
-                else if ((item.ExtType == Etw.EVENT_HEADER_EXT_TYPE_STACK_TRACE32 || item.ExtType == Etw.EVENT_HEADER_EXT_TYPE_STACK_TRACE64)
-                    && item.DataSize >= sizeof(ulong))
-                {
-                    this.stackMatchId = *((ulong*)data);
-                    if (item.ExtType == Etw.EVENT_HEADER_EXT_TYPE_STACK_TRACE32)
-                    {
-                        int count = (item.DataSize - sizeof(ulong)) / sizeof(uint);
-                        this.stacks = new ulong[count];
-                        uint* addresses = (uint*)(data + sizeof(ulong));
-                        for (int j = 0; j < count; j++) this.stacks[j] = addresses[j];
-                    }
-                    else
-                    {
-                        int count = (item.DataSize - sizeof(ulong)) / sizeof(ulong);
-                        this.stacks = new ulong[count];
-                        ulong* addresses = (ulong*)(data + sizeof(ulong));
-                        for (int j = 0; j < count; j++) this.stacks[j] = addresses[j];
-                    }
-                }
-            }
+            var extended = ExtendedEventDataSnapshot.Capture(eventRecord->ExtendedData, eventRecord->ExtendedDataCount);
+            this.relatedActivityId = extended.RelatedActivityId;
+            this.stacks = extended.Stacks;
+            this.stackMatchId = extended.StackMatchId;
+            this.rawExtendedData = extended.Items;
+            this.extendedDataErrors = extended.Errors;
         }
 
         public string SourceFile => this.sourceFile;
@@ -127,6 +100,12 @@
         public byte Version => this.eventRecord.Version;
 
         public byte[] GetRawPayload() => (byte[])this.rawPayload.Clone();
+
+        public ExtendedEventData[] GetRawExtendedData() => this.rawExtendedData == null
+            ? Array.Empty<ExtendedEventData>() : (ExtendedEventData[])this.rawExtendedData.Clone();
+
+        public string[] GetExtendedDataErrors() => this.extendedDataErrors == null
+            ? Array.Empty<string>() : (string[])this.extendedDataErrors.Clone();
 
         public ushort Flags => this.eventRecord.Flags;
 

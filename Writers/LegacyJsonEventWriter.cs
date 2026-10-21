@@ -49,6 +49,8 @@ namespace ETW2JSON
             w.WriteString("Timestamp", JsonlEventWriter.FormatTimestamp(runtimeMetadata.Timestamp));
             w.WriteNumber("raw_timestamp", runtimeMetadata.RawTimestamp);
             JsonlEventWriter.WriteTraceClock(w, runtimeMetadata.TraceClock);
+            EventHeaderJsonWriter.Write(w, runtimeMetadata);
+            ExtendedDataJsonWriter.Write(w, runtimeMetadata);
             w.WriteString("ProviderGuid", metadata.ProviderGuid.ToString("D"));
             w.WriteNumber("Id", metadata.Id);
             w.WriteNumber("Version", metadata.Version);

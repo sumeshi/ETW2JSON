@@ -257,7 +257,7 @@
     internal static class Tdh
     {
         [DllImport("tdh.dll", EntryPoint = "TdhGetEventInformation")]
-        internal static extern unsafe int GetEventInformation(EVENT_RECORD* pEvent, uint TdhContextCount, IntPtr pTdhContext, byte* pBuffer, out uint pBufferSize);
+        internal static extern unsafe int GetEventInformation(EVENT_RECORD* pEvent, uint TdhContextCount, IntPtr pTdhContext, byte* pBuffer, ref uint pBufferSize);
 
         [DllImport("tdh.dll", EntryPoint = "TdhGetEventMapInformation", CharSet = CharSet.Unicode)]
         internal static extern unsafe int GetEventMapInformation(EVENT_RECORD* pEvent, string pMapName, byte* pBuffer, out uint pBufferSize);

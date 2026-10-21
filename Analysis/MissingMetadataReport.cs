@@ -33,10 +33,15 @@ namespace ETW2JSON.Analysis
                 writer.WriteLine("Provider: " + (GetProviderName(entry, providerInfo) ?? "{unknown}"));
                 writer.WriteLine("Event ID: " + entry.Key.EventId);
                 writer.WriteLine("Version: " + entry.Key.Version);
+                if (entry.Key.ClassicOpcode.HasValue) writer.WriteLine("Classic/MOF opcode: " + entry.Key.ClassicOpcode.Value);
                 writer.WriteLine("Count: " + entry.Count);
                 writer.WriteLine("Metadata resolution: " + entry.MetadataStatus);
                 writer.WriteLine("Reason: " + (entry.Reason ?? "No usable schema was resolved from the ETL or supplied metadata."));
-                WriteCollectionGuidance(writer, entry.Key.ProviderGuid, providerInfo);
+                if (entry.Key.ClassicOpcode.HasValue)
+                {
+                    writer.WriteLine("Collection guidance: " + ClassicGuidance);
+                }
+                else WriteCollectionGuidance(writer, entry.Key.ProviderGuid, providerInfo);
                 writer.WriteLine();
             }
         }
@@ -65,20 +70,24 @@ namespace ETW2JSON.Analysis
                     writer.WriteString("provider_name", GetProviderName(entry, providerInfo));
                     writer.WriteNumber("event_id", entry.Key.EventId);
                     writer.WriteNumber("version", entry.Key.Version);
+                    if (entry.Key.ClassicOpcode.HasValue) writer.WriteNumber("classic_opcode", entry.Key.ClassicOpcode.Value);
                     writer.WriteNumber("count", entry.Count);
                     writer.WriteString("metadata_status", entry.MetadataStatus);
                     if (!string.IsNullOrEmpty(entry.Reason))
                     {
                         writer.WriteString("metadata_reason", entry.Reason);
                     }
-                    writer.WriteString("registry_key_candidate", GetPublisherKey(entry.Key.ProviderGuid));
+                    writer.WriteString("registry_key_candidate", entry.Key.ClassicOpcode.HasValue ? null : GetPublisherKey(entry.Key.ProviderGuid));
                     writer.WritePropertyName("registry_values_to_check");
                     writer.WriteStartArray();
-                    writer.WriteStringValue("ResourceFileName");
-                    writer.WriteStringValue("MessageFileName");
-                    writer.WriteStringValue("ParameterFileName");
+                    if (!entry.Key.ClassicOpcode.HasValue)
+                    {
+                        writer.WriteStringValue("ResourceFileName");
+                        writer.WriteStringValue("MessageFileName");
+                        writer.WriteStringValue("ParameterFileName");
+                    }
                     writer.WriteEndArray();
-                    writer.WriteString("guidance", "On the evidence Windows host, inspect the listed publisher values, copy referenced provider binaries from the evidence, and pass them with --resource. A path shown in registry data is only a candidate until the file is recovered and parsed.");
+                    writer.WriteString("guidance", entry.Key.ClassicOpcode.HasValue ? ClassicGuidance : "On the evidence Windows host, inspect the listed publisher values, copy referenced provider binaries from the evidence, and pass them with --resource. A path shown in registry data is only a candidate until the file is recovered and parsed.");
                     if (providerInfo != null && providerInfo.TryGetProvider(entry.Key.ProviderGuid, out ExportedProviderInfo exported))
                     {
                         writer.WritePropertyName("exported_provider_info");
@@ -128,6 +137,8 @@ namespace ETW2JSON.Analysis
             writer.WriteLine("  If the original provider .man is available, supply it with --manifest. Keep unresolved events as raw/best-effort output.");
             writer.WriteLine("  Registry paths are candidates only unless an evidence hive was actually read; host registry values are never used as evidence.");
         }
+
+        private const string ClassicGuidance = "This GUID identifies a classic/MOF event class, not a WINEVT publisher. Recover a trace containing embedded KernelTraceControl schema metadata or the matching MOF definitions from the evidence system. This tool does not import MOF files directly; retain unresolved payloads as raw data. Analysis-host metadata remains an explicit --allow-local-metadata fallback and may differ from the evidence system.";
 
         private static void WriteCandidate(TextWriter writer, string label, string value)
         {

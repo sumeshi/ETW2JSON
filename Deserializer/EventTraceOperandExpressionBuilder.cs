@@ -45,9 +45,16 @@
                 Expression.Assign(eventMetadata, Expression.ArrayAccess(eventMetadataTable, Expression.Constant(operand.EventMetadataTableIndex))),
                 Expression.Assign(properties, Expression.PropertyOrField(eventMetadata, "Properties")),
                 eventRecordWriter.Call("WriteEventBegin", eventMetadata, runtimeMetadata),
-                expGenerator.CodeGenerate(operand.EventPropertyOperands),
-                eventRecordWriter.Call("WriteEventEnd")
+                expGenerator.CodeGenerate(operand.EventPropertyOperands)
             };
+
+            if (operand.Metadata.DecodeStatus == DecodeStatus.Decoded)
+            {
+                // Validate before committing the buffered event. A mismatched schema
+                // must use the raw decode-error fallback instead of claiming success.
+                list.Add(eventRecordReader.Call(nameof(EventRecordReader.EnsurePayloadConsumed)));
+            }
+            list.Add(eventRecordWriter.Call("WriteEventEnd"));
 
             var returnExpression = Expression.Block(variables, list);
             return returnExpression;

@@ -23,6 +23,16 @@
             this.arrayElementBudget.Reserve(count);
         }
 
+        /// <summary>A full decode must account for every byte in the event payload.</summary>
+        public void EnsurePayloadConsumed()
+        {
+            int remaining = this.RemainingBytes;
+            if (remaining != 0)
+            {
+                throw new InvalidOperationException("Event payload has " + remaining + " unconsumed bytes; the schema does not describe the complete payload.");
+            }
+        }
+
         /// <summary>
         /// Reader for TDH_INTYPE_UNICODESTRING
         /// </summary>
@@ -425,9 +435,9 @@
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public unsafe string ReadReversedCountedString()
         {
-            byte low = this.ReadUInt8();
             byte high = this.ReadUInt8();
-            ushort length = (ushort)(((uint)low & 0xFF) | ((uint)high & 0xFF) << 8);
+            byte low = this.ReadUInt8();
+            ushort length = (ushort)((high << 8) | low);
 
             return this.ReadUnicodeStringHelper(length);
         }
@@ -438,9 +448,9 @@
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public unsafe string ReadReversedCountedAnsiString()
         {
-            byte low = this.ReadUInt8();
             byte high = this.ReadUInt8();
-            ushort length = (ushort)(((uint)low & 0xFF) | ((uint)high & 0xFF) << 8);
+            byte low = this.ReadUInt8();
+            ushort length = (ushort)((high << 8) | low);
 
             return this.ReadAnsiStringHelper(length);
         }
@@ -534,6 +544,10 @@
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private unsafe string ReadUnicodeStringHelper(int length)
         {
+            if ((length & 1) != 0)
+            {
+                throw new InvalidOperationException("UTF-16 payload string has an odd byte length.");
+            }
             this.EnsureAvailable(length);
             string value = new string((char*)this.eventRecord->UserData, 0, length / 2);
             this.eventRecord->UserData += value.Length * 2;
@@ -544,8 +558,17 @@
         {
             get
             {
-                if (this.eventRecord == null || this.eventRecord->UserDataFixed == null || this.eventRecord->UserData == null)
+                if (this.eventRecord == null)
                 {
+                    throw new InvalidOperationException("Event payload pointer is unavailable.");
+                }
+
+                if (this.eventRecord->UserDataFixed == null || this.eventRecord->UserData == null)
+                {
+                    if (this.eventRecord->UserDataLength == 0 && this.eventRecord->UserDataFixed == null && this.eventRecord->UserData == null)
+                    {
+                        return 0;
+                    }
                     throw new InvalidOperationException("Event payload pointer is unavailable.");
                 }
 

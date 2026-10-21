@@ -21,7 +21,7 @@ namespace ETWDeserializer
             if (this.cache.TryGetValue(key, out var existing))
             {
                 if (existing.Status == ResolutionStatus.Conflict) return;
-                if (!existing.Resolved || !result.Resolved || !Equivalent(existing.Operand.Metadata, result.Operand.Metadata))
+                if (!existing.Resolved || !result.Resolved || !SchemaEquivalence.AreEquivalent(existing.Operand, result.Operand))
                 {
                     this.cache[key] = ResolutionResult.UnresolvedResult(ResolutionStatus.Conflict, MetadataSource.Embedded, existing.Provenance + ";" + result.Provenance, "Embedded schemas from different ETL sources conflict for " + key + ".");
                     return;
@@ -46,17 +46,6 @@ namespace ETWDeserializer
 
         public bool Contains(EventKey key) => this.cache.ContainsKey(key);
 
-        private static bool Equivalent(EventMetadata left, EventMetadata right)
-        {
-            if (left.Name != right.Name || left.ResolutionStatus != right.ResolutionStatus || left.Properties.Length != right.Properties.Length) return false;
-            for (int i = 0; i < left.Properties.Length; i++)
-            {
-                var a = left.Properties[i];
-                var b = right.Properties[i];
-                if (a.Name != b.Name || a.InType != b.InType || a.OutType != b.OutType || a.IsStruct != b.IsStruct || a.ChildrenCount != b.ChildrenCount) return false;
-            }
-            return true;
-        }
     }
 
     /// <summary>
@@ -94,7 +83,7 @@ namespace ETWDeserializer
             if (cache.TryGetValue(key, out var previous))
             {
                 if (previous.Status == ResolutionStatus.Conflict) return;
-                if (!previous.Resolved || !result.Resolved || !CachedSchemaResolverEquivalent(previous.Operand.Metadata, result.Operand.Metadata))
+                if (!previous.Resolved || !result.Resolved || !SchemaEquivalence.AreEquivalent(previous.Operand, result.Operand))
                 {
                     cache[key] = ResolutionResult.UnresolvedResult(ResolutionStatus.Conflict, MetadataSource.Embedded,
                         previous.Provenance + ";" + result.Provenance,
@@ -147,16 +136,5 @@ namespace ETWDeserializer
             return cache;
         }
 
-        private static bool CachedSchemaResolverEquivalent(EventMetadata left, EventMetadata right)
-        {
-            if (left.Name != right.Name || left.Properties.Length != right.Properties.Length) return false;
-            for (int i = 0; i < left.Properties.Length; i++)
-            {
-                var a = left.Properties[i];
-                var b = right.Properties[i];
-                if (a.Name != b.Name || a.InType != b.InType || a.OutType != b.OutType || a.IsStruct != b.IsStruct || a.ChildrenCount != b.ChildrenCount) return false;
-            }
-            return true;
-        }
     }
 }

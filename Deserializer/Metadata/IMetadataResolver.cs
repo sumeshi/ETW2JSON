@@ -5,11 +5,12 @@ namespace ETWDeserializer
     /// <summary>Identity of an event schema: provider + event id + version.</summary>
     public readonly struct EventKey : IEquatable<EventKey>
     {
-        public EventKey(Guid providerGuid, ushort eventId, byte version)
+        public EventKey(Guid providerGuid, ushort eventId, byte version, byte? classicOpcode = null)
         {
             this.ProviderGuid = providerGuid;
             this.EventId = eventId;
             this.Version = version;
+            this.ClassicOpcode = classicOpcode;
         }
 
         public Guid ProviderGuid { get; }
@@ -18,11 +19,15 @@ namespace ETWDeserializer
 
         public byte Version { get; }
 
+        /// <summary>MOF event type; absent for manifest and TraceLogging events.</summary>
+        public byte? ClassicOpcode { get; }
+
         public bool Equals(EventKey other)
         {
             return this.ProviderGuid.Equals(other.ProviderGuid)
                 && this.EventId == other.EventId
-                && this.Version == other.Version;
+                && this.Version == other.Version
+                && this.ClassicOpcode == other.ClassicOpcode;
         }
 
         public override bool Equals(object obj)
@@ -37,13 +42,15 @@ namespace ETWDeserializer
                 var hashCode = this.ProviderGuid.GetHashCode();
                 hashCode = (hashCode * 397) ^ this.EventId.GetHashCode();
                 hashCode = (hashCode * 397) ^ this.Version.GetHashCode();
+                if (this.ClassicOpcode.HasValue) hashCode = (hashCode * 397) ^ (256 + this.ClassicOpcode.Value);
                 return hashCode;
             }
         }
 
         public override string ToString()
         {
-            return "{" + this.ProviderGuid.ToString("D") + "}:" + this.EventId + ":" + this.Version;
+            return "{" + this.ProviderGuid.ToString("D") + "}:" + this.EventId + ":" + this.Version
+                + (this.ClassicOpcode.HasValue ? ":classic_opcode=" + this.ClassicOpcode.Value : string.Empty);
         }
     }
 

@@ -32,8 +32,8 @@
 
         static KernelTraceControlImageIdFileVersionParser()
         {
-            ImageSize = new PropertyMetadata(TDH_IN_TYPE.TDH_INTYPE_INT32, TDH_OUT_TYPE.TDH_OUTTYPE_UNSIGNEDINT, "ImageSize", false, false, 0, null);
-            TimeDateStamp = new PropertyMetadata(TDH_IN_TYPE.TDH_INTYPE_INT32, TDH_OUT_TYPE.TDH_OUTTYPE_UNSIGNEDINT, "TimeDateStamp", false, false, 0, null);
+            ImageSize = new PropertyMetadata(TDH_IN_TYPE.TDH_INTYPE_UINT32, TDH_OUT_TYPE.TDH_OUTTYPE_UNSIGNEDINT, "ImageSize", false, false, 0, null);
+            TimeDateStamp = new PropertyMetadata(TDH_IN_TYPE.TDH_INTYPE_UINT32, TDH_OUT_TYPE.TDH_OUTTYPE_UNSIGNEDINT, "TimeDateStamp", false, false, 0, null);
             OrigFileName = new PropertyMetadata(TDH_IN_TYPE.TDH_INTYPE_UNICODESTRING, TDH_OUT_TYPE.TDH_OUTTYPE_STRING, "OrigFileName", false, false, 0, null);
             FileDescription = new PropertyMetadata(TDH_IN_TYPE.TDH_INTYPE_UNICODESTRING, TDH_OUT_TYPE.TDH_OUTTYPE_STRING, "FileDescription", false, false, 0, null);
             FileVersion = new PropertyMetadata(TDH_IN_TYPE.TDH_INTYPE_UNICODESTRING, TDH_OUT_TYPE.TDH_OUTTYPE_STRING, "FileVersion", false, false, 0, null);
@@ -44,25 +44,26 @@
             ProductVersion = new PropertyMetadata(TDH_IN_TYPE.TDH_INTYPE_UNICODESTRING, TDH_OUT_TYPE.TDH_OUTTYPE_STRING, "ProductVersion", false, false, 0, null);
             FileId = new PropertyMetadata(TDH_IN_TYPE.TDH_INTYPE_UNICODESTRING, TDH_OUT_TYPE.TDH_OUTTYPE_STRING, "FileId", false, false, 0, null);
             ProgramId = new PropertyMetadata(TDH_IN_TYPE.TDH_INTYPE_UNICODESTRING, TDH_OUT_TYPE.TDH_OUTTYPE_STRING, "ProgramId", false, false, 0, null);
-            EventMetadata = new EventMetadata(
+            EventMetadata = CustomParserMetadata.Create(
                 new Guid("b3e675d7-2554-4f18-830b-2762732560de"),
                 64,
-                0,
                 "KernelTraceControl/ImageID/FileVersion",
-                new[] { ImageSize, TimeDateStamp, OrigFileName, FileDescription, FileVersion, BinFileVersion, VerLanguage, ProductName, CompanyName, ProductVersion, FileId, ProgramId });
+                new[] { ImageSize, TimeDateStamp, OrigFileName, FileDescription, FileVersion, BinFileVersion, VerLanguage, ProductName, CompanyName, ProductVersion, FileId, ProgramId }, "uint32,uint32,10*utf16z");
         }
+
+        internal static EventMetadata SchemaMetadata => EventMetadata;
 
         public void Parse<T>(EventRecordReader reader, T writer, EventMetadata[] metadataArray, RuntimeEventMetadata runtimeMetadata)
             where T : IEtwWriter
         {
-            writer.WriteEventBegin(EventMetadata, runtimeMetadata);
+            writer.WriteEventBegin(CustomParserMetadata.Bind(EventMetadata, runtimeMetadata), runtimeMetadata);
 
             writer.WritePropertyBegin(ImageSize);
-            writer.WriteUInt64(reader.ReadUInt32());
+            writer.WriteUInt32(reader.ReadUInt32());
             writer.WritePropertyEnd();
 
             writer.WritePropertyBegin(TimeDateStamp);
-            writer.WriteUInt64(reader.ReadUInt32());
+            writer.WriteUInt32(reader.ReadUInt32());
             writer.WritePropertyEnd();
 
             writer.WritePropertyBegin(OrigFileName);
@@ -105,6 +106,7 @@
             writer.WriteUnicodeString(reader.ReadUnicodeString());
             writer.WritePropertyEnd();
 
+            reader.EnsurePayloadConsumed();
             writer.WriteEventEnd();
         }
     }

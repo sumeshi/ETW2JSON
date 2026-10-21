@@ -384,6 +384,8 @@
                 string opcode = this.BuildName("Opcode", this.traceEventInfo->Opcode.ToString(), this.traceEventInfo->OpcodeNameOffset);
 
                 bool isWpp = this.traceEventInfo->DecodingSource == DECODING_SOURCE.DecodingSourceWPP;
+                Guid eventProvider = this.traceEventInfo->EventGuid != Guid.Empty ? this.traceEventInfo->EventGuid : this.traceEventInfo->ProviderGuid;
+                ushort eventId = this.traceEventInfo->EventGuid != Guid.Empty ? (ushort)0 : this.traceEventInfo->Id;
 
                 string unsupportedReason = isWpp ? "WPP decoding is not supported by this decoder." : null;
                 for (int i = 0; unsupportedReason == null && i < this.traceEventInfo->PropertyCount; i++)
@@ -402,8 +404,8 @@
                 if (unsupportedReason != null)
                 {
                     var unsupportedMetadata = new EventMetadata(
-                        this.traceEventInfo->ProviderGuid,
-                        this.traceEventInfo->Id,
+                        eventProvider,
+                        eventId,
                         this.traceEventInfo->Version,
                         provider + "/" + task + "/" + opcode,
                         Array.Empty<PropertyMetadata>(),
@@ -418,8 +420,8 @@
                 int end = (int)this.traceEventInfo->TopLevelPropertyCount;
                 var topLevelOperands = this.IterateProperties(buffer, 0, end, eventPropertyInfoArr);
                 var metadata = new EventMetadata(
-                    this.traceEventInfo->ProviderGuid,
-                    this.traceEventInfo->Id,
+                    eventProvider,
+                    eventId,
                     this.traceEventInfo->Version,
                     provider + "/" + task + "/" + opcode,
                     this.flatPropertyList.Select(t => t.Metadata).ToArray(),

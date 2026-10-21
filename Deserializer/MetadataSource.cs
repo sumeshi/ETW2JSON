@@ -26,6 +26,9 @@ namespace ETWDeserializer
 
         /// <summary>Schema obtained from the analysis host's provider registration. Disabled by default.</summary>
         LocalCache,
+
+        /// <summary>A repository-owned parser for a documented kernel payload layout.</summary>
+        BuiltinParser,
     }
 
     /// <summary>Outcome of decoding a single event.</summary>
@@ -65,6 +68,8 @@ namespace ETWDeserializer
                     return "offline_registry_resolved";
                 case MetadataSource.LocalCache:
                     return "local_cache";
+                case MetadataSource.BuiltinParser:
+                    return "builtin_parser";
                 default:
                     return "unknown";
             }

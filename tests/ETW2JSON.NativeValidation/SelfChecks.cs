@@ -1,0 +1,56 @@
+using System.Text.Json;
+
+namespace ETW2JSON.NativeValidation;
+
+internal static class SelfChecks
+{
+    internal static int Run()
+    {
+        int checks = 0;
+        try
+        {
+            NativeRawReader.ValidateLayout();
+            checks++;
+            Check(ulong.MaxValue, "18446744073709551615", ValueResult.Match);
+            Check(ulong.MaxValue, "18446744073709551614", ValueResult.Mismatch);
+            Check(0.1f, "0.1", ValueResult.Match);
+            Check(0.1d, "0.1000000001", ValueResult.Mismatch);
+            Check(float.NaN, "null", ValueResult.Unsupported);
+            Check(true, "true", ValueResult.Match);
+            Check(false, "0", ValueResult.Mismatch);
+            Check('A', "65", ValueResult.Match);
+            Check(new byte[] { 1, 2, 3 }, "\"AQID\"", ValueResult.Match);
+            Check(new byte[] { 1, 2, 3 }, "\"AQIE\"", ValueResult.Mismatch);
+            Check(new int[] { 1, 2 }, "[1,2]", ValueResult.Match);
+            Check(new int[] { 1, 2 }, "[1,3]", ValueResult.Mismatch);
+            Check(new Dictionary<string, object> { ["items"] = new[] { 1, 2 } }, "{\"items\":[1,2]}", ValueResult.Match);
+            Check(new Dictionary<string, object> { ["items"] = new[] { 1, 2 } }, "{\"items\":[1,2],\"extra\":0}", ValueResult.Mismatch);
+            Check(Guid.Parse("11111111-2222-3333-4444-555555555555"), "\"11111111-2222-3333-4444-555555555555\"", ValueResult.Match);
+            Check(DateTimeOffset.Parse("2026-01-01T00:00:00+00:00"), "\"2026-01-01T01:00:00+01:00\"", ValueResult.Match);
+            Check("<<<EXCEPTION_DURING_VALUE_LOOKUP ArgumentException>>>", "\"anything\"", ValueResult.Unsupported);
+            Check("[UNSUPPORTED TYPE]", "\"[UNSUPPORTED TYPE]\"", ValueResult.Unsupported);
+            Check(new object(), "{}", ValueResult.Unsupported);
+            var options = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower };
+            var original = new RawIndex(7, Guid.NewGuid(), 0x100, uint.MaxValue, 10, long.MaxValue, 3, "payload-hash", true);
+            var restored = JsonSerializer.Deserialize<RawIndex>(JsonSerializer.Serialize(original, options), options);
+            if (original != restored) throw new InvalidOperationException("The streaming native-index record did not round-trip.");
+            checks++;
+            Console.WriteLine($"{checks} portable harness self-checks passed. Native ETL comparison was not executed.");
+            return 0;
+        }
+        catch (Exception error)
+        {
+            Console.Error.WriteLine("Harness self-check failed: " + error);
+            return 2;
+        }
+
+        void Check(object? value, string json, ValueResult expected)
+        {
+            using var document = JsonDocument.Parse(json);
+            var actual = PayloadValueComparer.Compare(value, document.RootElement);
+            if (actual.Result != expected)
+                throw new InvalidOperationException($"Value comparison returned {actual.Result}; expected {expected} for {value} against {json}.");
+            checks++;
+        }
+    }
+}

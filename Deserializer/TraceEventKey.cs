@@ -10,11 +10,14 @@
 
         private readonly byte version;
 
-        public TraceEventKey(Guid providerId, ushort id, byte version)
+        private readonly bool classic;
+
+        public TraceEventKey(Guid providerId, ushort id, byte version, bool classic = false)
         {
             this.providerId = providerId;
             this.id = id;
             this.version = version;
+            this.classic = classic;
         }
 
         public Guid ProviderId => this.providerId;
@@ -25,7 +28,7 @@
 
         public bool Equals(TraceEventKey other)
         {
-            return this.providerId.Equals(other.providerId) && this.id == other.id && this.version == other.version;
+            return this.providerId.Equals(other.providerId) && this.id == other.id && this.version == other.version && this.classic == other.classic;
         }
 
         public override bool Equals(object obj)
@@ -45,6 +48,7 @@
                 var hashCode = this.providerId.GetHashCode();
                 hashCode = (hashCode * 397) ^ this.id.GetHashCode();
                 hashCode = (hashCode * 397) ^ this.version.GetHashCode();
+                if (this.classic) hashCode = (hashCode * 397) ^ 1;
                 return hashCode;
             }
         }
