@@ -33,7 +33,15 @@ internal static class NativeRawReader
                     if (record.UserData == IntPtr.Zero) throw new InvalidDataException("Native record has a null payload pointer.");
                     Marshal.Copy(record.UserData, bytes, 0, bytes.Length);
                 }
-                observe(new RawRecord(record.Header, bytes));
+                bool traceLogging = false;
+                for (int i = 0; record.ExtendedData != IntPtr.Zero && i < record.ExtendedDataCount; i++)
+                {
+                    // EVENT_HEADER_EXTENDED_DATA_ITEM is 16 bytes; ExtType is at
+                    // offset 2. This is a mapping hint, not extended-data validation.
+                    if (unchecked((ushort)Marshal.ReadInt16(record.ExtendedData, i * 16 + 2)) == 0x000b)
+                        traceLogging = true;
+                }
+                observe(new RawRecord(record.Header, bytes, traceLogging));
             }
             catch (Exception error)
             {
@@ -165,7 +173,7 @@ internal static class NativeRawReader
     }
 }
 
-internal sealed record RawRecord(NativeRawReader.EventHeader Header, byte[] Payload);
+internal sealed record RawRecord(NativeRawReader.EventHeader Header, byte[] Payload, bool TraceLogging);
 internal sealed record NativeSession(long PerformanceFrequency, uint RawClockType, uint EventsLost, uint BuffersLost)
 {
     public uint CloseTraceStatus { get; set; }

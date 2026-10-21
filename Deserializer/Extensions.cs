@@ -68,7 +68,7 @@
                 case "hexint64":
                     return TDH_IN_TYPE.TDH_INTYPE_HEXINT64;
                 default:
-                    throw new Exception("Unreachable");
+                    throw new NotSupportedException("Manifest input type is not supported: " + value);
             }
         }
 

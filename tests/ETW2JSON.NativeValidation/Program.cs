@@ -177,6 +177,12 @@ internal static class Program
                     JsonElement root = json.RootElement;
                     string status = root.GetProperty("decode_status").GetString() ?? "{null}";
                     provider.ApplicationStatuses.Increment(status);
+                    if (status != "decoded")
+                    {
+                        string? note = root.TryGetProperty("decode_note", out var noteValue) ? noteValue.GetString() : null;
+                        string? source = root.TryGetProperty("metadata_source", out var sourceValue) ? sourceValue.GetString() : null;
+                        report.RecordApplicationNotDecoded(raw.Header.ProviderId, ordinal, status, note, source);
+                    }
                     JsonElement header = root.GetProperty("event_header");
                     Check("provider_guid", raw.Header.ProviderId.ToString("D"), header.GetProperty("provider_guid").GetGuid().ToString("D"));
                     CheckNumber("event_id", raw.Header.Id);
@@ -191,7 +197,8 @@ internal static class Program
                     Check("thread_id", raw.Header.ThreadId.ToString(CultureInfo.InvariantCulture), root.GetProperty("thread_id").GetUInt32().ToString(CultureInfo.InvariantCulture));
                     Check("raw_timestamp", raw.Header.Timestamp.ToString(CultureInfo.InvariantCulture), root.GetProperty("raw_timestamp").GetInt64().ToString(CultureInfo.InvariantCulture));
                     byte[] payload = root.GetProperty("raw_payload").GetBytesFromBase64();
-                    if (!raw.Payload.AsSpan().SequenceEqual(payload)) Check("raw_payload", hash, Hash(payload));
+                    if (!raw.Payload.AsSpan().SequenceEqual(payload))
+                        Check("raw_payload", "byte-for-byte match; sha256=" + hash, "bytes differ; sha256=" + Hash(payload));
                     Check("source_file", etl.ToUpperInvariant(), Path.GetFullPath(root.GetProperty("source_file").GetString()!).ToUpperInvariant());
                     void CheckNumber(string field, ulong value) => Check("event_header." + field,
                         value.ToString(CultureInfo.InvariantCulture), header.GetProperty(field).GetUInt64().ToString(CultureInfo.InvariantCulture));
@@ -203,6 +210,7 @@ internal static class Program
             }
             if (!matched) report.Raw.MismatchedRecords++;
             index.WriteLine(JsonSerializer.Serialize(new RawIndex(ordinal, raw.Header.ProviderId, raw.Header.Flags,
+                raw.Header.Id, raw.Header.Version, raw.Header.Opcode, raw.TraceLogging,
                 raw.Header.ProcessId, raw.Header.ThreadId, raw.Header.Timestamp, raw.Payload.Length, hash, matched), JsonOptions));
         });
         while (application.ReadLine() is not null)
@@ -242,6 +250,14 @@ internal static class Program
         if (!source.Process()) throw new InvalidOperationException("TraceEvent metadata-learning pass did not complete.");
         using var index = File.OpenText(Path.Combine(directory, "native-index.jsonl"));
         using var application = OpenApplicationOutput(directory);
+        var matcher = new BoundedRecordMatcher(() =>
+        {
+            string? line = index.ReadLine();
+            if (line == null) return null;
+            var native = JsonSerializer.Deserialize<RawIndex>(line, JsonOptions)
+                ?? throw new InvalidDataException("The native index contains a null record.");
+            return new RecordPair(native, application.ReadLine() ?? string.Empty);
+        });
         comparisonPass = true;
         source.AllEvents += data =>
         {
@@ -249,37 +265,33 @@ internal static class Program
             try
             {
                 long ordinal = ++report.Semantic.TraceEventRecords;
-                string? nativeLine = index.ReadLine();
-                string? appLine = application.ReadLine();
-                if (nativeLine == null || appLine == null)
+                byte[] referencePayload = data.EventData();
+#pragma warning disable CS0618 // Public raw clock accessor: no DateTime/relative-MS conversion or rounding.
+                long rawTimestamp = data.TimeStampQPC;
+#pragma warning restore CS0618
+                // TaskGuid identifies the source classic provider, whereas the
+                // public ProviderGuid can be the normalized parser provider.
+                var identity = new ReferenceIdentity(data.IsClassicProvider ? data.TaskGuid : data.ProviderGuid,
+                    data.IsClassicProvider, (int)data.ID, data.Version, (int)data.Opcode,
+                    unchecked((uint)data.ProcessID), unchecked((uint)data.ThreadID), rawTimestamp,
+                    referencePayload.Length, Hash(referencePayload));
+                MatchResult match = matcher.Match(identity);
+                if (match.Pair == null)
                 {
                     report.Semantic.UnmatchedToNative++;
-                    report.Semantic.SkippedRecords.Increment("reference_record_has_no_native_or_application_peer");
+                    report.Semantic.SkippedRecords.Increment(match.FailureReason!);
+                    report.Diagnose("reference_mapping", ordinal, "record", "unique native record in bounded window with matching source, clock, payload and version", data.EventName);
                     return;
                 }
-                var native = JsonSerializer.Deserialize<RawIndex>(nativeLine, JsonOptions)!;
+                RawIndex native = match.Pair.Native;
                 ProviderSummary provider = report.Provider(native.ProviderGuid);
                 if (!native.ApplicationMatched)
                 {
                     report.Semantic.SkippedRecords.Increment("application_raw_record_mismatch");
                     return;
                 }
-                byte[] referencePayload = data.EventData();
-#pragma warning disable CS0618 // Public raw clock accessor: no DateTime/relative-MS conversion or rounding.
-                long rawTimestamp = data.TimeStampQPC;
-#pragma warning restore CS0618
-                // TraceEvent rewrites TraceLogging IDs and normalizes classic identities. Never
-                // use its ID/ProviderGuid as a substitute for the original native EVENT_RECORD.
-                bool providerMatches = (native.Flags & 0x0100) != 0 || data.ProviderGuid == native.ProviderGuid;
-                if (!providerMatches || rawTimestamp != native.RawTimestamp || referencePayload.Length != native.PayloadLength
-                    || Hash(referencePayload) != native.PayloadSha256 || unchecked((uint)data.ProcessID) != native.ProcessId
-                    || unchecked((uint)data.ThreadID) != native.ThreadId)
-                {
-                    report.Semantic.UnmatchedToNative++;
-                    report.Semantic.SkippedRecords.Increment("reference_fixup_or_sequence_does_not_match_original_record");
-                    report.Diagnose("reference_mapping", ordinal, "record", "same ordinal, raw clock, payload, PID/TID and nonclassic provider", data.EventName);
-                    return;
-                }
+                if (match.ContextFixedUp) report.Semantic.ReferencePidTidFixupMatches++;
+                if (native.Ordinal != ordinal) report.Semantic.ReferenceDisplacedOrdinalMatches++;
                 report.Semantic.MatchedToNative++;
                 provider.ReferenceMappedRecords++;
                 bool dynamicPayload = dynamicFields != null;
@@ -291,7 +303,7 @@ internal static class Program
                 }
                 report.Semantic.ReferenceKnownPayloadRecords++;
                 provider.ReferenceKnownPayloadRecords++;
-                using var app = JsonDocument.Parse(appLine);
+                using var app = JsonDocument.Parse(match.Pair.ApplicationLine);
                 JsonElement root = app.RootElement;
                 if (root.GetProperty("decode_status").GetString() != "decoded")
                 {
@@ -353,13 +365,15 @@ internal static class Program
         };
         bool completed = source.Process();
         report.Semantic.ReferenceReportedEventsLost = source.EventsLost;
+        report.Semantic.NativeRecordsWithoutReferenceMatch = report.Raw.NativeRecords - report.Semantic.MatchedToNative;
+        report.Semantic.NativeRecordsEvictedFromMatchingWindow = matcher.NativeRecordsEvicted;
+        report.Semantic.PeakBufferedNativeRecords = matcher.PeakBufferedRecords;
+        report.Semantic.ReferenceRecordCountDifference = report.Semantic.TraceEventRecords - report.Raw.NativeRecords;
         if (callbackError != null) throw new InvalidOperationException("TraceEvent comparison callback failed.", callbackError);
         if (!completed) throw new InvalidOperationException("TraceEvent comparison pass did not complete.");
         if (report.Semantic.TraceEventRecords != report.Raw.NativeRecords)
         {
-            report.Raw.MismatchedRecords++;
-            report.Raw.MismatchFields.Increment("traceevent_record_count");
-            report.Diagnose("reference", 0, "record_count", report.Raw.NativeRecords.ToString(CultureInfo.InvariantCulture),
+            report.Diagnose("reference_coverage", 0, "record_count", report.Raw.NativeRecords.ToString(CultureInfo.InvariantCulture),
                 report.Semantic.TraceEventRecords.ToString(CultureInfo.InvariantCulture));
         }
     }
@@ -397,7 +411,8 @@ internal static class Program
 
 internal sealed record ReferenceField(string Name, object? Value, string? Error);
 
-internal sealed record RawIndex(long Ordinal, Guid ProviderGuid, ushort Flags, uint ProcessId, uint ThreadId,
+internal sealed record RawIndex(long Ordinal, Guid ProviderGuid, ushort Flags, ushort EventId, byte Version, byte Opcode,
+    bool TraceLogging, uint ProcessId, uint ThreadId,
     long RawTimestamp, int PayloadLength, string PayloadSha256, bool ApplicationMatched);
 
 internal sealed class ComparisonReport
@@ -426,6 +441,7 @@ internal sealed class ComparisonReport
         "TraceEvent normalizes classic/TraceLogging identities and can fix up data; original headers are compared only with the independent native pass.",
         "Raw comparison covers the nine documented event_header fields, PID/TID, raw timestamp, payload bytes, source and counts. Activity/related-activity IDs, stack extensions and other extended-data items are not compared.",
         "Semantic comparison covers mapped records and supported values only; skipped fields/providers and reference-decodable application gaps are reported separately.",
+        "Semantic matching uses at most 128 native/application record pairs (8 Mi characters plus one pending record), with timestamp-guided forward resynchronization. Ambiguous, outside-window or fixed-up payloads remain unmatched; reference callback counts are coverage, not a native/application raw mismatch.",
         "TraceEvent Dynamic can consult the analysis host's registered TDH metadata; agreement does not authenticate a schema against the evidence installation.",
         "Scalar and recursively supported array/structure values are compared. Static-parser property aliases are not guessed.",
         "Only the first 100 diagnostics are retained. Counters cover the complete run.",
@@ -436,6 +452,18 @@ internal sealed class ComparisonReport
         string key = guid.ToString("D");
         if (!Providers.TryGetValue(key, out var provider)) Providers[key] = provider = new();
         return provider;
+    }
+
+    public void RecordApplicationNotDecoded(Guid providerGuid, long ordinal, string status, string? note, string? source)
+    {
+        string reason = string.IsNullOrWhiteSpace(note) ? "No decode_note was emitted." : note;
+        string key = status + ": " + (reason.Length <= 512 ? reason : reason[..512] + "…");
+        bool firstProviderReason = Provider(providerGuid).ApplicationNotDecodedReasons.IncrementBounded(key, 16);
+        Semantic.ApplicationNotDecodedReasons.IncrementBounded(key, 32);
+        if (firstProviderReason)
+            Diagnose("application_coverage", ordinal, "provider=" + providerGuid.ToString("D") + "; decode_note",
+                "application decode_status=decoded",
+                "decode_status=" + status + "; metadata_source=" + (source ?? "{absent}") + "; decode_note=" + reason);
     }
 
     public void Diagnose(string phase, long ordinal, string field, string reference, string actual)
@@ -458,6 +486,12 @@ internal sealed class SemanticComparison
     public long TraceEventRecords { get; set; }
     public long MatchedToNative { get; set; }
     public long UnmatchedToNative { get; set; }
+    public long NativeRecordsWithoutReferenceMatch { get; set; }
+    public long NativeRecordsEvictedFromMatchingWindow { get; set; }
+    public int PeakBufferedNativeRecords { get; set; }
+    public long ReferenceRecordCountDifference { get; set; }
+    public long ReferencePidTidFixupMatches { get; set; }
+    public long ReferenceDisplacedOrdinalMatches { get; set; }
     public long ReferenceKnownPayloadRecords { get; set; }
     public long ComparedRecords { get; set; }
     public long ComparedFields { get; set; }
@@ -465,6 +499,7 @@ internal sealed class SemanticComparison
     public int ReferenceReportedEventsLost { get; set; }
     public Dictionary<string, long> SkippedRecords { get; } = new();
     public Dictionary<string, long> SkippedFields { get; } = new();
+    public Dictionary<string, long> ApplicationNotDecodedReasons { get; } = new();
 }
 
 internal sealed class ProviderSummary
@@ -477,6 +512,7 @@ internal sealed class ProviderSummary
     public long ComparedFields { get; set; }
     public long MismatchingFields { get; set; }
     public Dictionary<string, long> ApplicationStatuses { get; } = new();
+    public Dictionary<string, long> ApplicationNotDecodedReasons { get; } = new();
 }
 
 internal sealed record Diagnostic(string Phase, long Ordinal, string Field, string Reference, string Actual);
@@ -484,4 +520,16 @@ internal sealed record Diagnostic(string Phase, long Ordinal, string Field, stri
 internal static class Counters
 {
     public static void Increment(this Dictionary<string, long> values, string name) => values[name] = values.GetValueOrDefault(name) + 1;
+
+    public static bool IncrementBounded(this Dictionary<string, long> values, string name, int maximumReasons)
+    {
+        bool firstReason = !values.ContainsKey(name);
+        if (firstReason && values.Count >= maximumReasons)
+        {
+            values.Increment("{other reason variants}");
+            return false;
+        }
+        values.Increment(name);
+        return firstReason;
+    }
 }

@@ -27,6 +27,7 @@ jobs:
         run: |
           dotnet restore tests/ETW2JSON.NativeValidation/ETW2JSON.NativeValidation.csproj --locked-mode
           dotnet build tests/ETW2JSON.NativeValidation/ETW2JSON.NativeValidation.csproj -c Release --no-restore
+          dotnet tests/ETW2JSON.NativeValidation/bin/Release/net10.0-windows/ETW2JSON.NativeValidation.dll --self-check
 
       - name: Generate ETL fixtures and run Windows smoke checks
         shell: pwsh

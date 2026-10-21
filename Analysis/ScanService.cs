@@ -6,6 +6,7 @@ namespace ETW2JSON.Analysis
     using System.Linq;
     using System.Text.Json;
     using ETWDeserializer;
+    using ETWDeserializer.CustomParsers;
 
     /// <summary>
     /// Streaming analysis pass: enumerates ETL records exactly once, resolves their
@@ -97,13 +98,17 @@ namespace ETW2JSON.Analysis
                     {
                         mixedRecordReason ??= observed.RecordSpecificFailureReason;
                     }
-                    if (observed != null && (observed.Source == MetadataSource.TraceLogging || observed.Source == MetadataSource.BuiltinParser || IsHeaderUnsupported(observed.Metadata)))
+                    var eventKey = new EventKey(pair.Key.ProviderGuid, pair.Key.EventId, pair.Key.Version, pair.Key.ClassicOpcode);
+                    bool embeddedBeforeBuiltin = observed?.Source == MetadataSource.BuiltinParser && KernelInvestigationParsers.Supports(eventKey)
+                        && resolver.Known.TryGetValue(eventKey, out var embedded) && embedded.Source == MetadataSource.Embedded;
+                    if (observed != null && (observed.Source == MetadataSource.TraceLogging
+                        || observed.Source == MetadataSource.BuiltinParser && !embeddedBeforeBuiltin || IsHeaderUnsupported(observed.Metadata)))
                     {
                         resolvedBySource.Add(observed);
                         continue;
                     }
 
-                    var result = resolver.Resolve(new EventKey(pair.Key.ProviderGuid, pair.Key.EventId, pair.Key.Version, pair.Key.ClassicOpcode));
+                    var result = resolver.Resolve(eventKey);
                     if (result.Resolved && observed?.RecordSpecificFailureReason != null)
                     {
                         mixedRecordReason ??= observed.RecordSpecificFailureReason;
@@ -112,7 +117,7 @@ namespace ETW2JSON.Analysis
                     {
                         resolvedBySource.Add(new SourceObservation(null, result.Source, result.Status, result.Reason, null));
                     }
-                    else if (result.Resolved && (observed == null || observed.Status == ResolutionStatus.Missing
+                    else if (result.Resolved && (observed == null || observed.Status == ResolutionStatus.Missing || embeddedBeforeBuiltin
                         || SourcePriority(result.Source) >= SourcePriority(observed.Source)))
                     {
                         resolvedBySource.Add(new SourceObservation(result.Operand.Metadata.ProviderName, result.Source, result.Status,

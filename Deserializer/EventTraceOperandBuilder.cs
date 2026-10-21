@@ -128,23 +128,23 @@
         public static IReadOnlyList<EventKey> GetEventKeys(instrumentationManifest manifest, Guid providerGuid)
         {
             var keys = new HashSet<EventKey>();
-            foreach (var item in manifest.Items)
+            foreach (var item in manifest.Items ?? Array.Empty<object>())
             {
                 var instrumentation = item as InstrumentationType;
                 if (instrumentation == null) continue;
-                foreach (var eventsContainer in instrumentation.Items)
+                foreach (var eventsContainer in instrumentation.Items ?? Array.Empty<object>())
                 {
                     var events = eventsContainer as EventsType;
                     if (events == null) continue;
-                    foreach (var providerItem in events.Items)
+                    foreach (var providerItem in events.Items ?? Array.Empty<object>())
                     {
                         var provider = providerItem as ProviderType;
                         if (provider == null || string.IsNullOrEmpty(provider.guid) || new Guid(provider.guid) != providerGuid) continue;
-                        foreach (var providerChild in provider.Items)
+                        foreach (var providerChild in provider.Items ?? Array.Empty<object>())
                         {
                             var definitions = providerChild as DefinitionType;
                             if (definitions == null) continue;
-                            foreach (EventDefinitionType definition in definitions.Items)
+                            foreach (EventDefinitionType definition in definitions.Items ?? Array.Empty<EventDefinitionType>())
                             {
                                 if (!ushort.TryParse(definition.value, out ushort id)) continue;
                                 byte version = string.IsNullOrEmpty(definition.version) ? (byte)0 : byte.Parse(definition.version);
@@ -161,23 +161,23 @@
         private static int CountMatchingDefinitions(instrumentationManifest manifest, EventKey key)
         {
             int count = 0;
-            foreach (var item in manifest.Items)
+            foreach (var item in manifest.Items ?? Array.Empty<object>())
             {
                 var instrumentation = item as InstrumentationType;
                 if (instrumentation == null) continue;
-                foreach (var eventsContainer in instrumentation.Items)
+                foreach (var eventsContainer in instrumentation.Items ?? Array.Empty<object>())
                 {
                     var events = eventsContainer as EventsType;
                     if (events == null) continue;
-                    foreach (var providerItem in events.Items)
+                    foreach (var providerItem in events.Items ?? Array.Empty<object>())
                     {
                         var provider = providerItem as ProviderType;
                         if (provider == null || string.IsNullOrEmpty(provider.guid) || new Guid(provider.guid) != key.ProviderGuid) continue;
-                        foreach (var providerChild in provider.Items)
+                        foreach (var providerChild in provider.Items ?? Array.Empty<object>())
                         {
                             var definitions = providerChild as DefinitionType;
                             if (definitions == null) continue;
-                            foreach (EventDefinitionType definition in definitions.Items)
+                            foreach (EventDefinitionType definition in definitions.Items ?? Array.Empty<EventDefinitionType>())
                             {
                                 byte version = string.IsNullOrEmpty(definition.version) ? (byte)0 : byte.Parse(definition.version);
                                 if (string.Equals(definition.value, key.EventId.ToString("D"), StringComparison.Ordinal) && version == key.Version) count++;
@@ -221,17 +221,17 @@
 
             public IEventTraceOperand Build(int eventMetadataTableIndex)
             {
-                foreach (var instrumentationManifestTypeItem in this.manifest.Items)
+                foreach (var instrumentationManifestTypeItem in this.manifest.Items ?? Array.Empty<object>())
                 {
                     var instrumentationType = instrumentationManifestTypeItem as InstrumentationType;
                     if (instrumentationType != null)
                     {
-                        foreach (var instrumentationTypeItem in instrumentationType.Items)
+                        foreach (var instrumentationTypeItem in instrumentationType.Items ?? Array.Empty<object>())
                         {
                             var eventTypes = instrumentationTypeItem as EventsType;
                             if (eventTypes != null)
                             {
-                                foreach (var eventTypeItem in eventTypes.Items)
+                                foreach (var eventTypeItem in eventTypes.Items ?? Array.Empty<object>())
                                 {
                                     var providerType = eventTypeItem as ProviderType;
                                     if (providerType != null)
@@ -244,12 +244,12 @@
                                             continue;
                                         }
 
-                                        foreach (var providerTypeItem in providerType.Items)
+                                        foreach (var providerTypeItem in providerType.Items ?? Array.Empty<object>())
                                         {
                                             var definitionType = providerTypeItem as DefinitionType;
                                             if (definitionType != null)
                                             {
-                                                foreach (EventDefinitionType definitionTypeItem in definitionType.Items)
+                                                foreach (EventDefinitionType definitionTypeItem in definitionType.Items ?? Array.Empty<EventDefinitionType>())
                                                 {
                                                     if (string.Equals(definitionTypeItem.value, this.eventId.ToString("D")))
                                                     {
@@ -273,18 +273,22 @@
                                                         string name = providerName + "/" + task + (opcode == string.Empty ? string.Empty : "/" + opcode);
                                                         var properties = new List<IEventTracePropertyOperand>();
 
-                                                        foreach (var item in providerType.Items)
+                                                        foreach (var item in providerType.Items ?? Array.Empty<object>())
                                                         {
                                                             var templateList = item as TemplateListType;
                                                             if (templateList != null)
                                                             {
-                                                                foreach (var templateTid in templateList.template)
+                                                                foreach (var templateTid in templateList.template ?? Array.Empty<TemplateItemType>())
                                                                 {
                                                                     if (string.Equals(templateTid.tid, template))
                                                                     {
                                                                         templateFound = true;
                                                                         int i = 0;
-                                                                        foreach (var rawProperty in templateTid.Items)
+                                                                        if (templateTid.binary != null && templateTid.binary.Length != 0)
+                                                                        {
+                                                                            unsupportedReason = "Manifest binary templates are not decoded; the raw payload is retained.";
+                                                                        }
+                                                                        foreach (var rawProperty in templateTid.Items ?? Array.Empty<object>())
                                                                         {
                                                                             var propertyItem = rawProperty as DataDefinitionType;
                                                                             if (propertyItem == null)
@@ -308,7 +312,21 @@
                                                                                 continue;
                                                                             }
 
-                                                                            var inType = Extensions.ToTdhInType(propertyItem.inType.Name);
+                                                                            TDH_IN_TYPE inType;
+                                                                            try
+                                                                            {
+                                                                                inType = Extensions.ToTdhInType(propertyItem.inType.Name);
+                                                                            }
+                                                                            catch (NotSupportedException ex)
+                                                                            {
+                                                                                unsupportedReason = ex.Message + "; the raw payload is retained.";
+                                                                                continue;
+                                                                            }
+                                                                            if (inType == TDH_IN_TYPE.TDH_INTYPE_BINARY)
+                                                                            {
+                                                                                unsupportedReason = "Manifest Binary properties require a supported length specification; the raw payload is retained.";
+                                                                                continue;
+                                                                            }
                                                                             var outType = TDH_OUT_TYPE.TDH_OUTTYPE_NOPRINT;
                                                                             var metadata = new PropertyMetadata(inType, outType, propertyItem.name, false, false, 0, null);
                                                                             properties.Add(new EventTracePropertyOperand(metadata, i++, false, false, false, false, false));

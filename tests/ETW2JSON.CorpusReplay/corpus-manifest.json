@@ -1,0 +1,75 @@
+{
+  "source_repository": "https://github.com/microsoft/perfview",
+  "source_commit": "29b21620a6c295979e83dc99008262ad2f3c6a2d",
+  "source_license": "MIT, .NET Foundation and Contributors; https://github.com/microsoft/perfview/blob/29b21620a6c295979e83dc99008262ad2f3c6a2d/LICENSE.TXT",
+  "sample_source_root": "src/TraceEvent/TraceEvent.Tests/inputs",
+  "reference_reader": "dissect.etl 3.14 (AGPL-3.0-or-later), external Python validation process; not linked or copied into application",
+  "reference_dependencies": {"defusedxml": "0.7.1", "dissect.cstruct": "4.7", "dissect.etl": "3.14", "dissect.util": "3.24"},
+  "notes": [
+    "ETL reading performed on Linux by independent dissect.etl, not Windows OpenTrace.",
+    "EventHeader provider GUID is exported from raw ProviderId bytes with UUID(bytes_le=...), since dissect.etl EventHeader.provider_id currently displays first GUID components using wrong endianness.",
+    "replay_flags infer 32/64 and classic bits from on-disk header kind/marker. These are not native OpenTrace normalization results.",
+    "EventTraceHeader Version field is packed Type/Level/Version; exporter decomposes it explicitly.",
+    "Disk ETL order is buffer order, not the timestamp order delivered by native ProcessTrace.",
+    "Reference timestamp strings are dissect calculations and not independently verified UTC anchors.",
+    "Large source archive net.4.5.x64.etl.zip contains net.4.5.x86.etl, while session pointer size is 8 and some event headers are 32-bit.",
+    "PerfView baseline text may truncate long values and is corroboration rather than a complete machine-readable oracle."
+  ],
+  "files": [
+    {
+      "path": "samples/ClrEtwAll.man",
+      "bytes": 510331,
+      "sha256": "54a1895602e0a7d8c352ba5734c677bf7873c902c2463ffe89d1e8e6c4e45524"
+    },
+    {
+      "path": "samples/PerfViewData.etl",
+      "bytes": 327680,
+      "sha256": "5c10150fc9a321542135625b94dace3d4c33c1b47ea0a2f9e1a517927fd08f29"
+    },
+    {
+      "path": "samples/SelfDescribingSingleEvent.etl",
+      "bytes": 7403,
+      "sha256": "4c312c63c7d366e12b908c49769943886c017497183733bc2c93b8d80e932c7c"
+    },
+    {
+      "path": "samples/gcevents.baseline.txt",
+      "bytes": 14161,
+      "sha256": "cf58fb15bfd9286cdfe439a2d5caef3980c6a4d27fbe733fbccc110cff4a7501"
+    },
+    {
+      "path": "samples/gcevents.etl.zip",
+      "bytes": 2928,
+      "sha256": "f6edadb2aebc6ed2fc7a2adae4e6fc3f322c89df7acde97c626a95d8ff4dc6a9"
+    },
+    {
+      "path": "samples/net.4.5.x64.baseline.txt",
+      "bytes": 109427,
+      "sha256": "72c958508aaccb8d03a09babc524c34bf07c05c87a42e0683d06aa60bb8ae0e5"
+    },
+    {
+      "path": "samples/net.4.5.x64.etl.zip",
+      "bytes": 5343524,
+      "sha256": "71310652b20ec1b05e3ec183996dfe077b2bc66a83d14b310d28f74b3d56ed2d"
+    },
+    {
+      "path": "samples/net.4.5.x86.etl",
+      "bytes": 2596169,
+      "sha256": "2517f70d16d4139a5ed0bd1219b1637cd09439fa517ecad2f56914d0b1393b89"
+    },
+    {
+      "path": "samples/primitive-types.baseline.txt",
+      "bytes": 2581,
+      "sha256": "1a88c4bfb0d28c429ccfb5ea4a8611e8de01904758e666a78abc56606ff81c73"
+    },
+    {
+      "path": "samples/primitive-types.etl",
+      "bytes": 16384,
+      "sha256": "66df3cefc602cf91718faecb290a6dd38e7a6e494fac37f4a9176f8e581af50b"
+    },
+    {
+      "path": "samples/primitive-types.etl.zip",
+      "bytes": 1016,
+      "sha256": "7e1f6e04e23ba0fefa555cffa4142777b9f8c160c3ccd62cd8287b99c87838b7"
+    }
+  ]
+}

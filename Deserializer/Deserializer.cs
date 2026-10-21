@@ -182,8 +182,10 @@
                 var sourceKey = GetRecordKey(eventRecord);
                 // Self-describing records resolve their own schema before any
                 // external lookup, even when external definitions conflict.
-                if (!HasTraceLoggingSchema(eventRecord) && !HasBuiltinParser(eventRecord)
+                if (!HasTraceLoggingSchema(eventRecord)
                     && this.ResolverChain is PreflightMetadata scopedPreflight
+                    && (!HasBuiltinParser(eventRecord) || KernelInvestigationParsers.Supports(sourceKey)
+                        && scopedPreflight.Known.TryGetValue(sourceKey, out var embedded) && embedded.Source == MetadataSource.Embedded)
                     && scopedPreflight.Resolve(sourceKey).Status == ResolutionStatus.Conflict)
                 {
                     var conflict = BuildSchemaConflictOperand(eventRecord, scopedPreflight.Resolve(sourceKey));
@@ -769,13 +771,22 @@
         private static unsafe bool HasBuiltinParser(EVENT_RECORD* record)
         {
             return record->ProviderId == CustomParserGuids.KernelTraceControlImageIdGuid && (record->Opcode == 0 || record->Opcode == 36 || record->Opcode == 64)
-                || record->ProviderId == CustomParserGuids.KernelStackWalkGuid && record->Opcode == 32;
+                || record->ProviderId == CustomParserGuids.KernelStackWalkGuid && record->Opcode == 32
+                || KernelInvestigationParsers.Supports(GetRecordKey(record));
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
         private unsafe bool CustomParserLookup(EVENT_RECORD* eventRecord, RuntimeEventMetadata runtimeMetadata, ref TraceEventKey key)
         {
             if (HasTraceLoggingSchema(eventRecord)) return false;
+            var recordKey = GetRecordKey(eventRecord);
+            // The new investigation parsers fill schema gaps. Evidence carried
+            // by this ETL, including conflicts, remains authoritative.
+            if (KernelInvestigationParsers.Supports(recordKey) && this.ResolverChain is PreflightMetadata preflight
+                && preflight.Known.TryGetValue(recordKey, out var embedded) && embedded.Source == MetadataSource.Embedded)
+            {
+                return false;
+            }
             Action<EventRecordReader, T, EventMetadata[], RuntimeEventMetadata> parser = null;
             EventMetadata template = null;
             if (eventRecord->ProviderId == CustomParserGuids.KernelTraceControlImageIdGuid)
@@ -800,6 +811,27 @@
             {
                 parser = new KernelStackWalkEventParser().Parse;
                 template = KernelStackWalkEventParser.SchemaMetadata;
+            }
+            else if ((eventRecord->Flags & Etw.EVENT_HEADER_FLAG_CLASSIC_HEADER) != 0)
+            {
+                if (eventRecord->ProviderId == CustomParserGuids.KernelProcessGuid && KernelProcessV4Parser.Supports(eventRecord->Version, eventRecord->Opcode))
+                {
+                    var process = new KernelProcessV4Parser(eventRecord->Opcode);
+                    parser = process.Parse;
+                    template = process.SchemaMetadata;
+                }
+                else if (eventRecord->ProviderId == CustomParserGuids.KernelImageLoadGuid && KernelImageLoadV2Parser.Supports(eventRecord->Version, eventRecord->Opcode))
+                {
+                    var image = new KernelImageLoadV2Parser(eventRecord->Opcode);
+                    parser = image.Parse;
+                    template = image.SchemaMetadata;
+                }
+                else if (eventRecord->ProviderId == CustomParserGuids.KernelFileIoGuid && KernelFileNameV2Parser.Supports(eventRecord->Version, eventRecord->Opcode))
+                {
+                    var file = new KernelFileNameV2Parser(eventRecord->Opcode);
+                    parser = file.Parse;
+                    template = file.SchemaMetadata;
+                }
             }
 
             if (parser == null) return false;

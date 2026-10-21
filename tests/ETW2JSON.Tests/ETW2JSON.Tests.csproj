@@ -20,4 +20,10 @@
     <ProjectReference Include="../../ETW2JSON.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="../fixtures/real-records/kernel-investigation-reference.jsonl" Link="fixtures/kernel-investigation-reference.jsonl" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../fixtures/real-records/kernel-investigation-reference.LICENSE.txt" Link="fixtures/kernel-investigation-reference.LICENSE.txt" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../fixtures/real-records/clr-empty-template-reference.man" Link="fixtures/clr-empty-template-reference.man" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

@@ -233,6 +233,7 @@ Default output is JSONL (one event per line).";
             using var output = OpenOutput(options.Output, stdout);
 
             var watch = Stopwatch.StartNew();
+            var statistics = new ConversionStatistics();
 
             int result;
             if (options.Format == OutputFormat.Json)
@@ -241,6 +242,7 @@ Default output is JSONL (one event per line).";
                 var reader = WindowsEtwReader.Create(writer, stderr.WriteLine, _ => null);
                 reader.Deserializer.ResolverChain = chain;
                 reader.Deserializer.AllowLocalMetadata = options.AllowLocalMetadata;
+                reader.Deserializer.Observer = statistics.Observe;
                 var error = reader.Process(options.Inputs);
                 writer.Complete();
 
@@ -257,6 +259,7 @@ Default output is JSONL (one event per line).";
                 var reader = WindowsEtwReader.Create(writer, stderr.WriteLine, _ => null);
                 reader.Deserializer.ResolverChain = chain;
                 reader.Deserializer.AllowLocalMetadata = options.AllowLocalMetadata;
+                reader.Deserializer.Observer = statistics.Observe;
                 var error = reader.Process(options.Inputs);
                 writer.Dispose();
                 result = error == null ? (int)ExitCode.Success : (int)ExitCode.DecodeError;
@@ -267,6 +270,7 @@ Default output is JSONL (one event per line).";
             }
 
             watch.Stop();
+            statistics.WriteText(stderr);
             if (result == (int)ExitCode.Success)
             {
                 stderr.WriteLine("Finished in " + watch.ElapsedMilliseconds + " ms");

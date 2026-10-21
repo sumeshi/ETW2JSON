@@ -13,8 +13,9 @@ dotnet tests/ETW2JSON.NativeValidation/bin/Release/net10.0-windows/ETW2JSON.Nati
 ```
 
 `--self-check` runs portable checks of the declared interop layout, streaming
-index serialization and value comparisons. It does not read an ETL or validate
-native execution.
+index serialization, value comparisons and bounded record matching, including
+extra/omitted callbacks, ambiguous matches and PID/TID fixups. It does not read
+an ETL or validate native execution.
 
 On Windows x64, supply the built application DLL, one ETL, and a directory that
 does not yet exist. Metadata options for the application can follow `--`:
@@ -43,10 +44,21 @@ not compared. A raw match is limited to the fields listed above.
 
 It also reads the ETL with `ETWTraceEventSource`, first learning embedded manifests
 and then comparing payload values. It registers TraceEvent's Dynamic, CLR and
-Kernel parsers. A reference event is associated with the native/application record
-only if callback ordinal, raw clock, payload hash/length, PID/TID, and (for
-nonclassic events) source provider agree. No reflection or private TraceEvent API
-is used.
+Kernel parsers. A reference event is associated with a native/application record
+using a window of at most 128 records and an 8 Mi-character buffer budget (plus
+one pending record). The matching key includes raw clock, payload hash/length,
+source provider, version, and original modern ID or classic opcode; TraceLogging
+synthetic IDs are excluded. Classic source providers use public `TaskGuid`, which
+is distinct from TraceEvent's normalized `ProviderGuid`.
+
+Matching PID/TID is preferred; when TraceEvent has fixed them up, only a unique
+strong-key candidate is accepted and that choice is counted. Ambiguous matches
+are skipped. An extra reference callback does not consume a native record;
+omitted callbacks do not shift every following comparison. Forward
+resynchronization can evict a window only when all its raw timestamps precede
+the current reference timestamp. Large reorderings, changed payloads and
+out-of-window candidates remain unmatched. No reflection or private TraceEvent
+API is used.
 
 TraceEvent exposes `EventData()` and the public `TimeStampQPC` accessor, which reads
 the unconverted header timestamp for this source. It does not publicly expose
@@ -65,9 +77,20 @@ does not establish that those registrations match the acquired Windows system.
 Results are written to `comparison.json`, with per-provider decoding coverage,
 comparison/skip counters, source hashes, available event-loss indicators and the
 first 100 diagnostics. `native-index.jsonl` stores a streaming raw-record index;
-the implementation retains only the current event, provider counters and bounded
-diagnostics in memory. Artifacts can contain sensitive evidence paths and data;
+reference callback counts and unmatched native/reference records are semantic
+coverage indicators. They do not change the separate full native-to-CLI raw
+comparison outcome. The implementation retains the bounded matching window,
+current event, provider counters and bounded diagnostics in memory. Artifacts can contain sensitive evidence paths and data;
 keep them with the case's local validation results.
+
+`application_not_decoded_reasons` records application `decode_status` and
+`decode_note` counts, globally under `semantic` and per provider. It covers every
+nondecoded application event, including events without reference payload fields.
+One `application_coverage` diagnostic is emitted for each retained provider/reason,
+so repeated missing-schema records do not hide a later unsupported reason. These
+are coverage diagnostics, not raw or semantic mismatches. Reason dictionaries
+retain up to 32 global or 16 per-provider reason variants; additional variants
+are counted in an overflow bucket, and the original notes remain in the JSONL.
 
 | Exit code | Meaning |
 | --- | --- |

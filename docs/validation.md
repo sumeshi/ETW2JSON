@@ -9,20 +9,24 @@ record in an acquired file correctly or that a recovered schema matches the
 system that produced it. Treat a new provider/build combination as unvalidated
 until it passes the native and reference checks below.
 
-The current development review runs on Linux with the .NET SDK selected by
-`global.json`. Native ETW conversion, the Windows fixture, and comparisons with
-independent decoders have **not been run in this environment**. The configured
-Windows CI jobs do not supply evidence that this working tree passed those jobs.
+This page records the initial review and the validation procedure. The later
+review includes Windows native runs, public ETL replay and independent field
+comparisons; see [Investigation validation](investigation-validation.md) for the
+current measured results, supported layouts and remaining failures or gaps.
 
-The first review was checked on 2026-10-21, starting from commit `61a71fe`:
+The first review was checked on 2026-10-21, starting from commit `61a71fe`, on
+Linux with the SDK selected by `global.json`. At that point, native ETW
+conversion, the Windows fixture and independent decoder comparisons had not
+been run. The following results are that initial record, not the latest suite
+size or Windows outcome:
 
-| Check | Observed result on Linux / .NET SDK 10.0.401 |
+| Initial check | Historical result on Linux / .NET SDK 10.0.401 |
 | --- | --- |
 | Locked solution restore | Passed; dependency declarations and lockfiles unchanged. |
 | Release solution build | Passed; 0 errors, 16 existing obsolete-API/unused-variable warnings. |
-| Portable tests after the review changes | 108 passed, 0 failed, 0 skipped (42 existing tests and 66 added regression cases). |
-| Native Windows fixture | Not run in this environment. |
-| Acquired ETL corpus / independent decoder comparison | Not run. |
+| Portable tests after the first review changes | 108 passed, 0 failed, 0 skipped (42 existing tests and 66 added regression cases). |
+| Native Windows fixture | Not run at the time of the first review. |
+| Acquired ETL corpus / independent decoder comparison | Not run at the time of the first review. |
 
 ## Regression checks from the first investigation review
 
@@ -40,10 +44,11 @@ reporting behavior. These tests use synthetic records, not acquired ETLs.
 | Schema/custom-parser identities can differ from the original record, and header flags/channel were absent. | Add an `event_header` object copied from the original record in both output formats. Preserve the existing decoder identity fields. | `EventHeaderPreservationTests` |
 | Failed TDH lookup for a self-describing TraceLogging record could lose its schema origin and fall through to an unrelated external schema; external conflicts could also override valid self-describing records. | Resolve self-describing metadata before supplied schemas, retain per-record failures as diagnostic/raw fallback, and keep failures in the scan. Inject native error responses to test the managed control flow; actual TDH execution still requires Windows. | `TraceLoggingFailureTests` |
 
-The payload-consumption check applies to generated schema decoders. The inherited
-custom kernel parsers use a separate path and still require independent layout
-and identity validation. Full consumption also does not prove that a schema is
-correct: two different layouts can consume the same number of bytes.
+The initial payload-consumption check covered generated schema decoders. The
+later review also adds consumption checks to built-in parsers and independently
+compares selected kernel layouts; those results are in the current investigation
+validation record. Full consumption does not prove that a schema is correct:
+two different layouts can consume the same number of bytes.
 
 ## Run the portable checks
 
@@ -57,6 +62,9 @@ dotnet test ETW2JSON.sln -c Release --no-build
 
 Record the actual test summary and failures. A build or CLI help check alone is
 not a decoder validation. A schema-only scan does not read property values.
+Conversion's stderr `Event decode outcomes` summary reports actual interpretation
+statuses from the conversion pass. Preserve it with the exit status and other
+diagnostics; an exit code of `0` permits unresolved or erroneous event decodes.
 
 ## Establish a Windows baseline
 
@@ -112,16 +120,17 @@ events with a reason.
 
 ## Remaining development priorities
 
-1. Run the Windows baseline and representative traces above; resolve actual
-   mismatches before extending provider coverage. In particular, investigate
-   classic/MOF EventGuid versus provider identity in embedded TDH metadata and
-   the inherited kernel parsers' layout assumptions.
-2. Add automatic run records containing tool/version, options, input/metadata
-   hashes, per-status counts and completion state. Currently the examiner must
-   retain those details separately; a `0` exit status permits unresolved events.
-3. Add collection-loss/completeness reporting and validated UTC normalization
-   where the original trace clock supplies sufficient context. Neither an empty
-   missing-metadata report nor readable JSON proves a complete timeline.
+1. Extend the Windows and independent-reader baseline to representative
+   investigation traces and additional provider builds. Resolve remaining
+   mismatches and unverified comparisons described in the current investigation
+   record before claiming broader coverage, including other classic/MOF layouts.
+2. Add persistent run records containing tool/version, options, input/metadata
+   hashes and completion state. Conversion now reports per-status counts on
+   stderr; the examiner must still retain the other details separately.
+3. Extend collection-loss warnings into persistent completeness records and add
+   validated UTC normalization where the trace clock supplies sufficient context.
+   Neither an empty missing-metadata report nor readable JSON proves a complete
+   timeline, and zero reported loss counters do not establish complete collection.
 4. Expand schema support from observed, tested investigation needs. WPP,
    map-dependent records, and unsupported array/structure forms remain explicit
    coverage limits; do not silently reinterpret them as supported.

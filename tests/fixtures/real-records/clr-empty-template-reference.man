@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Extracted provider/event/template from PerfView ClrEtwAll.man; see .provenance.json and the accompanying PerfView MIT license. -->
+<instrumentationManifest xmlns="http://schemas.microsoft.com/win/2004/08/events" xmlns:win="http://manifests.microsoft.com/win/2004/08/windows/events">
+  <instrumentation><events>
+    <provider name="Microsoft-Windows-DotNETRuntimePrivate" guid="{763FD754-7086-4dfe-95EB-C01A46FAF4CA}">
+      <events><event value="4" version="2" level="win:Informational" template="GCPerHeapHistory" opcode="GCPerHeapHistory" task="GarbageCollectionPrivate" symbol="GCPerHeapHistory" /></events>
+      <templates><template tid="GCPerHeapHistory"></template></templates>
+    </provider>
+  </events></instrumentation>
+</instrumentationManifest>

@@ -31,9 +31,27 @@ internal static class SelfChecks
             Check("[UNSUPPORTED TYPE]", "\"[UNSUPPORTED TYPE]\"", ValueResult.Unsupported);
             Check(new object(), "{}", ValueResult.Unsupported);
             var options = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower };
-            var original = new RawIndex(7, Guid.NewGuid(), 0x100, uint.MaxValue, 10, long.MaxValue, 3, "payload-hash", true);
+            var original = new RawIndex(7, Guid.NewGuid(), 0x100, 0, 1, 32, false, uint.MaxValue, 10, long.MaxValue, 3, "payload-hash", true);
             var restored = JsonSerializer.Deserialize<RawIndex>(JsonSerializer.Serialize(original, options), options);
             if (original != restored) throw new InvalidOperationException("The streaming native-index record did not round-trip.");
+            checks++;
+            checks += MatcherSelfChecks.Run();
+            var coverage = new ComparisonReport();
+            Guid provider = Guid.Parse("11111111-2222-3333-4444-555555555555");
+            coverage.RecordApplicationNotDecoded(provider, 1, "metadata_missing", "Schema absent", "unknown");
+            coverage.RecordApplicationNotDecoded(provider, 2, "metadata_missing", "Schema absent", "unknown");
+            if (coverage.Diagnostics.Count != 1 || coverage.Semantic.ApplicationNotDecodedReasons["metadata_missing: Schema absent"] != 2)
+                throw new InvalidOperationException("Repeated application coverage reasons were not aggregated.");
+            checks++;
+            coverage.RecordApplicationNotDecoded(provider, 3, "unsupported", "Self-describing schema is unsupported", "trace_logging");
+            if (coverage.Diagnostics.Count != 2 || !coverage.Diagnostics[1].Actual.Contains("Self-describing schema is unsupported", StringComparison.Ordinal)
+                || coverage.Raw.MismatchedRecords != 0 || coverage.Semantic.MismatchingFields != 0)
+                throw new InvalidOperationException("An unsupported coverage note was hidden or counted as a mismatch.");
+            checks++;
+            for (int i = 0; i < 100; i++) coverage.RecordApplicationNotDecoded(provider, i + 4, "decode_error", "Variant " + i, "embedded");
+            if (coverage.Semantic.ApplicationNotDecodedReasons.Count > 33 || coverage.Provider(provider).ApplicationNotDecodedReasons.Count > 17
+                || !coverage.Semantic.ApplicationNotDecodedReasons.ContainsKey("{other reason variants}"))
+                throw new InvalidOperationException("Application reason counters were not bounded.");
             checks++;
             Console.WriteLine($"{checks} portable harness self-checks passed. Native ETL comparison was not executed.");
             return 0;

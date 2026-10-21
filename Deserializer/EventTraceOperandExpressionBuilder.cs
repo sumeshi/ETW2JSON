@@ -124,11 +124,11 @@
                             var local = Expression.Parameter(inType.CSharpType(), operand.Metadata.Name);
                             this.operandReferenceTable.Add(operand, local);
                             variables.Add(local);
-                            c = Expression.Block(Expression.Assign(local, readValue), Call(this.eventRecordWriter, inType.WriteMethodInfo(this.eventRecordWriter.Type, local.Type), local));
+                            c = Expression.Block(Expression.Assign(local, readValue), this.WriteValue(operand.Metadata, local));
                         }
                         else
                         {
-                            c = Call(this.eventRecordWriter, inType.WriteMethodInfo(this.eventRecordWriter.Type, inType.CSharpType()), readValue);
+                            c = this.WriteValue(operand.Metadata, readValue);
                         }
                     }
 
@@ -158,6 +158,28 @@
 
                 return list.Count == 0 ? (Expression)Expression.Empty() : Expression.Block(variables, list);
             }
+
+            private Expression WriteValue(PropertyMetadata metadata, Expression value)
+            {
+                // TDH describes wire width with InType and intended presentation
+                // with OutType. TraceLogging uses byte booleans and can encode a
+                // signed Int64 as UInt64 + LONG. Keep reference/count variables in
+                // their wire type while formatting the emitted value correctly.
+                if (metadata.OutType == TDH_OUT_TYPE.TDH_OUTTYPE_BOOLEAN && IsInteger(value.Type))
+                {
+                    return this.eventRecordWriter.Call("WriteBoolean", Expression.NotEqual(value, Expression.Default(value.Type)));
+                }
+                if (metadata.OutType == TDH_OUT_TYPE.TDH_OUTTYPE_LONG && value.Type == typeof(ulong))
+                {
+                    return this.eventRecordWriter.Call("WriteInt64", Expression.Convert(value, typeof(long)));
+                }
+
+                return Call(this.eventRecordWriter, metadata.InType.WriteMethodInfo(this.eventRecordWriter.Type, value.Type), value);
+            }
+
+            private static bool IsInteger(Type type) => type == typeof(byte) || type == typeof(sbyte)
+                || type == typeof(short) || type == typeof(ushort) || type == typeof(int) || type == typeof(uint)
+                || type == typeof(long) || type == typeof(ulong);
 
             private static MethodCallExpression Call(ParameterExpression instance, MethodInfo methodInfo, params Expression[] arguments)
             {
