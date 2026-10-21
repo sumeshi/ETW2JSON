@@ -67,6 +67,14 @@ foreach ($case in $cases) {
     $reportPath = Join-Path $caseOutput 'comparison.json'
     $report = if (Test-Path $reportPath) { Get-Content -Raw $reportPath | ConvertFrom-Json } else { $null }
     $results += @{ case = $case.Name; exit_code = $code; accepted_for_this_case = $acceptable; comparison = $report }
+    if (-not $acceptable -and $env:GITHUB_ACTIONS) {
+        # Surface the actual failure in the check annotations as well as the
+        # artifact. Keep raw integrity failures and semantic coverage explicit.
+        $diagnostic = if ($report) { $report | ConvertTo-Json -Depth 12 -Compress } else { 'No comparison.json was produced.' }
+        if ($diagnostic.Length -gt 16000) { $diagnostic = $diagnostic.Substring(0, 16000) + ' [see full artifact]' }
+        $diagnostic = $diagnostic.Replace('%', '%25').Replace("`r", '%0D').Replace("`n", '%0A')
+        Write-Output "::error title=External ETL $($case.Name)::exit_code=$code $diagnostic"
+    }
 }
 $results | ConvertTo-Json -Depth 20 | Set-Content -Encoding utf8 (Join-Path $OutputDirectory 'corpus-results.json')
 if ($env:GITHUB_STEP_SUMMARY) {
