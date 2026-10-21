@@ -37,6 +37,7 @@ internal static class SelfChecks
             checks++;
             checks += MatcherSelfChecks.Run();
             checks += TraceLoggingSchemaSelfChecks.Run();
+            checks += ReferenceScalarTypes.RunSelfChecks();
             var withSchema = original with { TraceLoggingScalarTypes = new()
             {
                 ["int64_type"] = new TraceLoggingScalarDeclaration(10),

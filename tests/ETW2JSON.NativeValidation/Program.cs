@@ -350,6 +350,15 @@ internal static class Program
                         }
                         expected = normalized;
                     }
+                    object? classicNormalized = ReferenceScalarTypes.NormalizeClassicImageTimestamp(native, name, expected);
+                    if (!Equals(expected, classicNormalized))
+                    {
+                        report.Semantic.ReferenceUnsignedReinterpretations++;
+                        report.Diagnose("reference_representation", ordinal, name,
+                            "TraceEvent signed value=" + Convert.ToString(expected, CultureInfo.InvariantCulture),
+                            "Image v2 declares UInt32; value=" + Convert.ToString(classicNormalized, CultureInfo.InvariantCulture));
+                    }
+                    expected = classicNormalized;
                     ValueComparison value = PayloadValueComparer.Compare(expected, actual);
                     if (value.Result == ValueResult.Unsupported)
                     {
@@ -463,6 +472,7 @@ internal sealed class ComparisonReport
         "TraceEvent Dynamic can consult the analysis host's registered TDH metadata; agreement does not authenticate a schema against the evidence installation.",
         "The reference kernel path mapper is the identity function so FileName comparisons use stored NT paths rather than translated drive paths.",
         "TraceEvent signed representations are reinterpreted as unsigned only for independently parsed flat TraceLogging UInt16/UInt32/UInt64 declarations with default output format. Reinterpretations are counted separately; field names do not select a type.",
+        "The exact classic Image v2 provider/ID/opcode layout also permits its documented UInt32 TimeDateStamp to correct TraceEvent's signed Int32 representation. Other static fields use ordinary comparisons.",
         "Scalar and recursively supported array/structure values are compared. Static-parser property aliases are not guessed.",
         "At most 20 diagnostics per phase and 100 overall are retained. Counters cover the complete run.",
     ];

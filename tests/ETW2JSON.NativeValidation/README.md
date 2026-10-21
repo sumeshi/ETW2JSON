@@ -102,6 +102,11 @@ short/int/long to be reinterpreted at that width. These cases appear in
 `reference_unsigned_reinterpretations`. Names do not select a type; signed
 declarations, nondefault formats, arrays and unverified layouts use ordinary
 comparison. This reader does not validate the complete extended-data output.
+The documented classic Image v2 `TimeDateStamp` also has a scoped UInt32 rule:
+the provider GUID, ID 0, version 2 and supported opcodes must all match before
+TraceEvent's negative Int32 representation can be reinterpreted. The independent
+MOF comparison confirms the four affected values. Other static fields retain
+ordinary comparison, and this rule shares the separate reinterpretation counter.
 
 The corpus wrapper has separate negative cases for absent metadata and a
 self-describing struct. It requires the pinned input hash, complete native raw
